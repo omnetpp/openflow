@@ -104,8 +104,7 @@ protected:
 public:
     AbstractControllerApp();
     ~AbstractControllerApp();
-
 };
 
-
 #endif
+
