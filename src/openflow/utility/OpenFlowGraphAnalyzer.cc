@@ -103,11 +103,21 @@ void OpenFlowGraphAnalyzer::initialize(int stage) {
        }
 
 
-       avgPathLength = avgPathLength /computedPaths.size();
+       if(computedPaths.size() > 0){
+           avgPathLength = avgPathLength /computedPaths.size();
+       } else {
+           avgPathLength = -1;
+       }
+
        numClientNodes = clMap.size();
        numSwitchNodes = swMap.size();
 
-       avgNumSwitchLinks = numLinks/numSwitchNodes;
+       if(numSwitchNodes > 0){
+           avgNumSwitchLinks = numLinks/numSwitchNodes;
+       } else {
+           avgNumSwitchLinks = -1;
+       }
+
 
        EV << "Min Path Length: " << minPathLength << endl;
        EV << "Max Path Length: " << maxPathLength << endl;

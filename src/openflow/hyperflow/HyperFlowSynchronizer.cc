@@ -118,14 +118,15 @@ void HyperFlowSynchronizer::handleSyncRequest(Packet *pkt){
 
     //create control channel
     std::list<ControlChannelEntry> tempControlChannel = std::list<ControlChannelEntry>();
-    std::list<ControlChannelEntry>::iterator iterControl;
     SimTime lastValidTime = simTime()-par("aliveInterval");
-    for(iterControl=controlChannel.begin();iterControl!=controlChannel.end();iterControl++){
+
+    auto iterControl = controlChannel.begin();
+    while(iterControl!=controlChannel.end()){
         if((*iterControl).time >= lastValidTime){
            tempControlChannel.push_back(*iterControl);
+           ++iterControl;
         } else {
-            controlChannel.erase(iterControl);
-            iterControl--;
+            iterControl = controlChannel.erase(iterControl);
         }
     }
     reply->getControlChannelForUpdate().insert(reply->getControlChannel().end(), tempControlChannel.begin(), tempControlChannel.end());
