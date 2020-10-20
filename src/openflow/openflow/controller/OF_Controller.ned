@@ -24,6 +24,7 @@ simple OF_Controller
         string address = default("");
         int port = default(6633);
         double serviceTime @unit("s") = default(0s);
+        double bootTime @unit("s") = default(0s);
         
     gates:
         input socketIn @labels(TcpCommand/up);

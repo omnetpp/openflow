@@ -52,6 +52,7 @@ protected:
     double lastChangeTime;
     std::map<int,double> avgQueueSize;
 
+    bool booted = false;
     bool busy;
     double serviceTime;
     std::list<cMessage *> msgList;

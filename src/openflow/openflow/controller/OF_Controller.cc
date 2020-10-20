@@ -76,7 +76,7 @@ void OF_Controller::handleStartOperation(LifecycleOperation *operation)
     //schedule booted message
     cMessage *booted = new cMessage("Booted");
     booted->setKind(MSGKIND_BOOTED);
-    scheduleAt(simTime(), booted);
+    scheduleAt(simTime() + par("bootTime").doubleValue(), booted);
 }
 
 
@@ -95,6 +95,7 @@ void OF_Controller::sendPacket(TcpSocket *socket, Packet *msg) {
 void OF_Controller::handleMessageWhenUp(cMessage *msg){
     if (msg->isSelfMessage()) {
         if (msg->getKind() == MSGKIND_BOOTED){
+            this->booted = true;
             emit(BootedSignalId, this);
         }
         else if (msg->getKind() == MSGKIND_EVENT){
@@ -124,7 +125,7 @@ void OF_Controller::handleMessageWhenUp(cMessage *msg){
         //delete the msg for efficiency
         delete msg;
     }
-    else{
+    else if (this->booted) {
         //imlement service time
         if (msg->getKind() == TCP_I_DATA ||  msg->getKind() ==TCP_I_URGENT_DATA) {
             if (busy) {
@@ -164,6 +165,11 @@ void OF_Controller::handleMessageWhenUp(cMessage *msg){
         }
         else
             delete msg;
+    }
+    else {
+        // this is not a self message and we are not yet booted
+        // ignore it.
+        delete msg;
     }
 }
 
