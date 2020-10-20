@@ -11,6 +11,9 @@ Flow_Table::Flow_Table() {
 
 }
 
+Flow_Table::~Flow_Table() {
+}
+
 
 static inline int flow_fields_match(const oxm_basic_match &m1, const oxm_basic_match &m2, const uint32_t w){
     return (((w & OFPFW_IN_PORT) || m1.OFB_IN_PORT == m2.OFB_IN_PORT)
@@ -45,5 +48,4 @@ Flow_Table_Entry* Flow_Table::lookup(oxm_basic_match &match) {
     }
     return NULL;
 }
-
 

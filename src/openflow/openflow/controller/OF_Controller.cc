@@ -29,7 +29,10 @@ OF_Controller::OF_Controller(){
 }
 
 OF_Controller::~OF_Controller(){
-
+    for(auto&& msg : this->msgList) {
+      delete msg;
+    }
+    this->msgList.clear();
 }
 
 void OF_Controller::initialize(int stage){

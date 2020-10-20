@@ -16,7 +16,10 @@ Buffer::Buffer(int cap){
 }
 
 Buffer::~Buffer(){
-
+    for(auto&& pair : pending_msgs) {
+      delete pair.second;
+    }
+    pending_msgs.clear();
 }
 
 int Buffer::size(){

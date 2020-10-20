@@ -14,10 +14,10 @@ using namespace __gnu_cxx;
 class Flow_Table {
 public:
     Flow_Table();
+    virtual ~Flow_Table();
     void addEntry(Flow_Table_Entry entry);
     Flow_Table_Entry * lookup(oxm_basic_match &match);
     void removeExpiredEntries();
-
 
 private:
     std::list<Flow_Table_Entry> entryList;
