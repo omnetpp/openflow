@@ -24,6 +24,6 @@ simple HyperFlowSynchronizer
         double serviceTime @unit("s") = default(0s);
         
     gates:
-        input tcpIn @labels(TCPCommand/up);
-        output tcpOut @labels(TCPCommand/down);
+        input socketIn @labels(TcpCommand/up);
+        output socketOut @labels(TcpCommand/down);
 }

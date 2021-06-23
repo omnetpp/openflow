@@ -1,8 +1,10 @@
 
 
 #include "openflow/hostApps/TCPTrafficGeneratorApp.h"
-#include "inet/transportlayer/contract/tcp/TCPSocket.h"
+#include "inet/transportlayer/contract/tcp/TcpSocket.h"
 #include "inet/networklayer/common/L3AddressResolver.h"
+#include "inet/applications/tcpapp/GenericAppMsg_m.h"
+#include "inet/common/TimeTag_m.h"
 
 using namespace std;
 using namespace inet;
@@ -10,40 +12,62 @@ using namespace inet;
 
 Define_Module(TCPTrafficGeneratorApp);
 
-
-void TCPTrafficGeneratorApp::initialize(){
-    topo.extractByNedTypeName(cStringTokenizer(par("destinationNedType")).asVector());
-
-    //determine the first connection setup
+void TCPTrafficGeneratorApp::handleStartOperation(LifecycleOperation *operation)
+{
+    simtime_t startTime = par("startSending");
+    simtime_t start = std::max(startTime, simTime());
     cMessage *msg = new cMessage("newConnection");
     msg->setKind(1);
-    scheduleAt((double)par("startSending"), msg);
+    timerSet.insert(msg);
+    scheduleAt(start, msg);
+}
 
-
-    //stats
-    connectionFinished =registerSignal("connectionFinished");
-    connectionStarted = registerSignal("connectionStarted");
-    connectionEstablished =registerSignal("connectionEstablished");
-    transmittedBytes = registerSignal("transmittedBytes");
-
-    //determine linenumbers
-    const int SZ = 1024 * 1024;
-    std::vector <char> buff( SZ );
-    std::string path = par("pathToFlowSizes");
-    ifstream ifs( path.c_str() );
-    while( int cc = FileRead( ifs, buff ) ) {
-        lineNumbers += CountLines( buff, cc );
+void TCPTrafficGeneratorApp::handleStopOperation(LifecycleOperation *operation)
+{
+    while(!timerSet.empty()) {
+        cancelAndDelete(*timerSet.begin());
+        timerSet.erase(timerSet.begin());
     }
-    ifs.close();
+}
+
+void TCPTrafficGeneratorApp::handleCrashOperation(LifecycleOperation *operation)
+{
+    while(!timerSet.empty()) {
+        cancelAndDelete(*timerSet.begin());
+        timerSet.erase(timerSet.begin());
+    }
 }
 
 
+void TCPTrafficGeneratorApp::initialize(int stage){
+    ApplicationBase::initialize(stage);
+    if (stage == INITSTAGE_LOCAL) {
+        topo.extractByNedTypeName(cStringTokenizer(par("destinationNedType")).asVector());
 
+    //determine the first connection setup
 
+        //stats
+        connectionFinished =registerSignal("connectionFinished");
+        connectionStarted = registerSignal("connectionStarted");
+        connectionEstablished =registerSignal("connectionEstablished");
+        transmittedBytes = registerSignal("transmittedBytes");
+        //determine linenumbers
+        const int SZ = 1024 * 1024;
+        std::vector <char> buff( SZ );
+        std::string path = par("pathToFlowSizes");
+        ifstream ifs( path.c_str() );
+        while( int cc = FileRead( ifs, buff ) ) {
+            lineNumbers += CountLines( buff, cc );
+        }
+        ifs.close();
+    }
+}
 
-void TCPTrafficGeneratorApp::handleMessage(cMessage *msg){
-
+void TCPTrafficGeneratorApp::handleMessageWhenUp(omnetpp::cMessage *msg){
     if (msg->isSelfMessage()){
+        auto timerIt = timerSet.find(msg);
+        if (timerIt != timerSet.end())
+            timerSet.erase(timerIt);
         if(msg->getKind() == 1){
             //determine random target
             int random_num = intrand(topo.getNumNodes());
@@ -57,19 +81,18 @@ void TCPTrafficGeneratorApp::handleMessage(cMessage *msg){
                 destAddr = L3AddressResolver().resolve(connectAddress.c_str());
             }
             //generate socket
-            TCPSocket *tempSocket = new TCPSocket();
-            tempSocket->setOutputGate(gate("tcpOut"));
-            tempSocket->setDataTransferMode(TCP_TRANSFER_OBJECT);
-            tempSocket->setCallbackObject(this,tempSocket);
+            TcpSocket *tempSocket = new TcpSocket();
+            tempSocket->setOutputGate(gate("socketOut"));
+            tempSocket->setCallback(this);
+
             int connectPort = par("connectPort");
 
             tempSocket->connect(destAddr, connectPort);
 
-
-
             //generate packet
-            cPacket *packet = new cPacket();
-            packet->setKind(TCP_C_SEND);
+            const auto& payload = makeShared<GenericAppMsg>();
+            Packet *packet = new Packet("data");
+
             int pos = floor(uniform(0,lineNumbers));
 
             //get the size of the nth line
@@ -84,22 +107,20 @@ void TCPTrafficGeneratorApp::handleMessage(cMessage *msg){
 
             f.close();
 
-            packet->setByteLength(size);
+            payload->setChunkLength(B(size));
+            payload->setServerClose(false);
+            payload->addTag<CreationTimeTag>()->setCreationTime(simTime());
+            packet->insertAtBack(payload);
 
             //send everything
             tempSocket->send(packet);
-
-
-
 
             //add to map
             Stats temp = Stats();
             temp.connectionStarted=simTime();
             temp.transmittedBytes=size;
 
-
             statistics[tempSocket]=temp;
-
 
             //schedule next connection
             cMessage *newMsg = new cMessage("newConnection");
@@ -109,24 +130,16 @@ void TCPTrafficGeneratorApp::handleMessage(cMessage *msg){
         }
         delete msg;
     } else {
-        if(TCPSocket::belongsToAnyTCPSocket(msg)){
-            //find the socket
-            std::map<TCPSocket *, Stats>::iterator iterConn;
-            TCPSocket * tempSocket = NULL;
-            for(iterConn=statistics.begin();iterConn!=statistics.end();iterConn++){
-                if(iterConn->first->belongsToSocket(msg)){
-                    tempSocket = iterConn->first;
-                    break;
-                }
+        TcpSocket * tempSocket = nullptr;
+        for (auto elem : statistics) {
+            if (elem.first->belongsToSocket(msg)) {
+                tempSocket = elem.first;
+                break;
             }
-
+        }
+        if(tempSocket){
             //process the message
-            if(tempSocket != NULL){
-                tempSocket->processMessage(msg);
-            } else {
-                error("This should not happen!");
-            }
-
+            tempSocket->processMessage(msg);
         } else {
             delete msg;
         }
@@ -134,48 +147,45 @@ void TCPTrafficGeneratorApp::handleMessage(cMessage *msg){
 }
 
 
-void TCPTrafficGeneratorApp::socketDataArrived(int connId, void *yourPtr, cPacket *msg, bool urgent){
+void TCPTrafficGeneratorApp::socketDataArrived(TcpSocket *socket, Packet *packet, bool urgent) {
     EV<< "TCPTrafficGenerator Data Arrived" << endl;
-    delete msg;
+    delete packet;
 }
 
-void TCPTrafficGeneratorApp::socketEstablished(int connId, void *yourPtr) {
+void TCPTrafficGeneratorApp::socketEstablished(TcpSocket *socket){
     EV<< "TCPTrafficGenerator Connection Established" << endl;
-    if (static_cast<TCPSocket *>(yourPtr) != NULL) {
-        TCPSocket *tempSocket = (TCPSocket *)yourPtr;
-        statistics[tempSocket].connectionEstablished = simTime();
+    if (socket != nullptr) {
+        statistics[socket].connectionEstablished = simTime();
     }
 }
 
-void TCPTrafficGeneratorApp::socketPeerClosed(int connId, void *yourPtr) {
+
+void TCPTrafficGeneratorApp::socketPeerClosed(TcpSocket *socket){
     EV<< "TCPTrafficGenerator Peer Closed -> Closing Too" << endl;
-    if (static_cast<TCPSocket *>(yourPtr) != NULL) {
-        TCPSocket *tempSocket = (TCPSocket *)yourPtr;
-        statistics[tempSocket].connectionFinished=simTime();
+    if (socket != nullptr) {
+        statistics[socket].connectionFinished=simTime();
 
         //emit vectors
-        emit(connectionStarted,statistics[tempSocket].connectionStarted);
-        emit(connectionEstablished,statistics[tempSocket].connectionEstablished);
-        emit(connectionFinished,statistics[tempSocket].connectionFinished);
-        emit(transmittedBytes,statistics[tempSocket].transmittedBytes);
-
-        tempSocket->close();
+        emit(connectionStarted,statistics[socket].connectionStarted);
+        emit(connectionEstablished,statistics[socket].connectionEstablished);
+        emit(connectionFinished,statistics[socket].connectionFinished);
+        emit(transmittedBytes,statistics[socket].transmittedBytes);
+        socket->close();
     }
 }
 
-void TCPTrafficGeneratorApp::socketClosed(int connId, void *yourPtr) {
+void TCPTrafficGeneratorApp::socketClosed(TcpSocket *socket){
     EV<< "TCPTrafficGenerator Socket Closed" << endl;
-    if (static_cast<TCPSocket *>(yourPtr) != NULL) {
-            TCPSocket *tempSocket = (TCPSocket *)yourPtr;
-            //remove the socket
-            statistics.erase(tempSocket);
 
+    if (socket != nullptr) {
+            //remove the socket
+            statistics.erase(socket);
             //clear up space
-            delete tempSocket;
+            delete socket;
     }
 }
 
-void TCPTrafficGeneratorApp::socketFailure(int connId, void *yourPtr, int code) {
+void TCPTrafficGeneratorApp::socketFailure(TcpSocket *socket, int code)  {
     EV<< "TCPTrafficGenerator Socket Failed" << endl;
     if (code==TCP_I_CONNECTION_RESET)
         EV << "Connection reset!\\n";
@@ -185,7 +195,7 @@ void TCPTrafficGeneratorApp::socketFailure(int connId, void *yourPtr, int code) 
         EV << "Connection timed out!\\n";
 }
 
-void TCPTrafficGeneratorApp::socketStatusArrived(int connId, void *yourPtr, TCPStatusInfo *status) {
+void TCPTrafficGeneratorApp::socketStatusArrived(TcpSocket *socket, TcpStatusInfo *status){
     EV<< "TCPTrafficGenerator Status Arrived" << endl;
     delete status;
 }

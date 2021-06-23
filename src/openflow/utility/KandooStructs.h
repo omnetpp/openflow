@@ -10,8 +10,8 @@ struct KandooEntry{
     std::string srcApp;
     std::string trgSwitch;
     std::string srcSwitch;
-    cObject * payload;
-    int type; //0 inform, 1 request, 2 reply
+    omnetpp::cObject * payload = nullptr;
+    int type = -1; //0 inform, 1 request, 2 reply
 };
 
 

@@ -7,22 +7,22 @@
 #define OFP_MAX_PORT_NAME_LEN 16
 #define OFP_ETH_ALEN 6
 
-#include "inet/linklayer/common/MACAddress.h"
-#include "inet/networklayer/contract/ipv4/IPv4Address.h"
+#include "inet/linklayer/common/MacAddress.h"
+#include "inet/networklayer/contract/ipv4/Ipv4Address.h"
 
 using namespace inet;
 
 struct oxm_basic_match {
     int OFB_IN_PORT;
-    MACAddress OFB_ETH_DST;
-    MACAddress OFB_ETH_SRC;
+    MacAddress OFB_ETH_DST;
+    MacAddress OFB_ETH_SRC;
     int OFB_ETH_TYPE;
-    IPv4Address OFB_IPV4_DST;
+    Ipv4Address OFB_IPV4_DST;
     int OFB_ARP_OP; /* ARP opcode. */
-    IPv4Address OFB_ARP_SPA; /* ARP source IPv4 address. */
-    IPv4Address OFB_ARP_TPA; /* ARP target IPv4 address. */
-    MACAddress OFB_ARP_SHA; /* ARP source hardware address. */
-    MACAddress OFB_ARP_THA; /* ARP target hardware address. */
+    Ipv4Address OFB_ARP_SPA; /* ARP source IPv4 address. */
+    Ipv4Address OFB_ARP_TPA; /* ARP target IPv4 address. */
+    MacAddress OFB_ARP_SHA; /* ARP source hardware address. */
+    MacAddress OFB_ARP_THA; /* ARP target hardware address. */
     uint32_t wildcards;
     int getPriority();
 };
@@ -276,6 +276,7 @@ public:
 //    uint8_t pad[6]; /* Pad to 64 bits. */
 //protected:
 //    virtual void doNothing();
+     std::string creationModule;
 };
 
 /* Flow setup and teardown (controller -> datapath). */

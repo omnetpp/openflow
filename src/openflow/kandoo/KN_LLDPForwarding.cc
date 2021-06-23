@@ -1,8 +1,10 @@
 #include "openflow/kandoo/KN_LLDPForwarding.h"
 #include <algorithm>
 #include <string>
-#include "inet/networklayer/ipv4/ICMPMessage.h"
-#include "inet/applications/pingapp/PingPayload_m.h"
+#include "inet/linklayer/ethernet/common/Ethernet.h"
+#include "inet/linklayer/ethernet/common/EthernetMacHeader_m.h"
+//#include "inet/networklayer/ipv4/ICMPMessage.h"
+//#include "inet/applications/pingapp/PingPayload_m.h"
 
 
 Define_Module(KN_LLDPForwarding);
@@ -16,25 +18,27 @@ KN_LLDPForwarding::~KN_LLDPForwarding(){
 
 }
 
-void KN_LLDPForwarding::initialize(){
-    LLDPForwarding::initialize();
+void KN_LLDPForwarding::initialize(int stage){
+    LLDPForwarding::initialize(stage);
 
 
-    knAgent = NULL;
-    appName="KN_LLDPForwarding";
-
-    //register signals
-    kandooEventSignalId =registerSignal("KandooEvent");
-    getParentModule()->subscribe("KandooEvent",this);
-    cpPingPacketHash = registerSignal("cpPingPacketHash");
-
+    if (stage == INITSTAGE_LOCAL) {
+        knAgent = NULL;
+        appName="KN_LLDPForwarding";
+        //register signals
+        kandooEventSignalId =registerSignal("KandooEvent");
+        getParentModule()->subscribe("KandooEvent",this);
+        cpPingPacketHash = registerSignal("cpPingPacketHash");
+    }
 }
 
 
 
-void KN_LLDPForwarding::handlePacketIn(OFP_Packet_In * packet_in_msg){
+void KN_LLDPForwarding::handlePacketIn(Packet * pktIn){
     //get some details
-    CommonHeaderFields headerFields = extractCommonHeaderFields(packet_in_msg);
+
+    auto packet_in_msg = pktIn->peekAtFront<OFP_Packet_In>();
+    CommonHeaderFields headerFields = extractCommonHeaderFields(pktIn);
 
     //ignore lldp packets
     if(headerFields.eth_type == 0x88CC){
@@ -52,15 +56,17 @@ void KN_LLDPForwarding::handlePacketIn(OFP_Packet_In * packet_in_msg){
     computePath(headerFields.swInfo->getMacAddress(),headerFields.dst_mac.str(),route);
 
     unsigned long hash =0;
+    int indetifier = 0;
+    int seqNum = 0;
+
 
     //emit id of ping packet to indicate where it was processed
-    if(packet_in_msg->getEncapsulatedPacket() != NULL && packet_in_msg->getEncapsulatedPacket()->getEncapsulatedPacket() != NULL && dynamic_cast<ICMPMessage *>(packet_in_msg->getEncapsulatedPacket()->getEncapsulatedPacket()->getEncapsulatedPacket()) != NULL){
-        ICMPMessage *icmpMessage = (ICMPMessage *)packet_in_msg->getEncapsulatedPacket()->getEncapsulatedPacket()->getEncapsulatedPacket();
+    // check ICMP
 
-        PingPayload * pingMsg =  (PingPayload * )icmpMessage->getEncapsulatedPacket();
+    if(chekIcmpEchoRequest(pktIn,seqNum, indetifier)) {
         //generate and emit hash
         std::stringstream hashString;
-        hashString << "SeqNo-" << pingMsg->getSeqNo() << "-Pid-" << pingMsg->getOriginatorId();
+        hashString << "SeqNo-" << seqNum << "-Pid-" << indetifier;
         hash = std::hash<std::string>()(hashString.str().c_str());
     }
 
@@ -85,9 +91,9 @@ void KN_LLDPForwarding::handlePacketIn(OFP_Packet_In * packet_in_msg){
 
         } else {
             if(dropIfNoRouteFound && headerFields.eth_type != ETHERTYPE_ARP){
-                dropPacket(packet_in_msg);
+                dropPacket(pktIn);
             } else {
-                floodPacket(packet_in_msg);
+                floodPacket(pktIn);
             }
         }
 
@@ -96,7 +102,7 @@ void KN_LLDPForwarding::handlePacketIn(OFP_Packet_In * packet_in_msg){
         //send packet to next hop
         LLDPPathSegment seg = route.front();
         route.pop_front();
-        sendPacket(packet_in_msg,seg.outport);
+        sendPacket(pktIn, seg.outport);
 
         //set flow mods for all switches under my controller's command
         oxm_basic_match match = oxm_basic_match();
@@ -107,7 +113,7 @@ void KN_LLDPForwarding::handlePacketIn(OFP_Packet_In * packet_in_msg){
         match.wildcards |=  OFPFW_DL_SRC;
         match.wildcards |= OFPFW_DL_TYPE;
 
-        TCPSocket * socket = controller->findSocketFor(packet_in_msg);
+        TcpSocket * socket = controller->findSocketFor(pktIn);
         sendFlowModMessage(OFPFC_ADD, match, seg.outport, socket,idleTimeout,hardTimeout);
 
         //concatenate route
@@ -127,7 +133,7 @@ void KN_LLDPForwarding::handlePacketIn(OFP_Packet_In * packet_in_msg){
 
             computedRoute += seg.chassisId + " -> ";
 
-            TCPSocket * socket = controller->findSocketForChassisId(seg.chassisId);
+            TcpSocket * socket = controller->findSocketForChassisId(seg.chassisId);
             //is switch under our control
             if(socket != NULL){
                 sendFlowModMessage(OFPFC_ADD, match, seg.outport, socket,idleTimeout,hardTimeout);
@@ -146,7 +152,7 @@ void KN_LLDPForwarding::handlePacketIn(OFP_Packet_In * packet_in_msg){
 
 void KN_LLDPForwarding::receiveSignal(cComponent *src, simsignal_t id, cObject *obj, cObject *details) {
     LLDPForwarding::receiveSignal(src,id,obj,details);
-
+    Enter_Method("KN_LLDPForwarding::receiveSignal %s", cComponent::getSignalName(id));
     //set knagent link
     if(knAgent == NULL && controller != NULL){
         auto appList = controller->getAppList();
@@ -160,148 +166,152 @@ void KN_LLDPForwarding::receiveSignal(cComponent *src, simsignal_t id, cObject *
         }
     }
 
-
-
     //check kandoo events
-    if(id == kandooEventSignalId){
-        if(dynamic_cast<KN_Packet *>(obj) != NULL) {
-            KN_Packet *knpck = (KN_Packet *) obj;
-            if(strcmp(knpck->getKnEntry().trgApp.c_str(),appName.c_str())==0){
+    if (id == kandooEventSignalId) {
+        auto pkt = check_and_cast<Packet*>(obj);
+        auto chunk = pkt->peekAtFront<Chunk>();
+        if (dynamicPtrCast<const KN_Packet>(chunk) != nullptr) {
+            auto pktKnpck = pkt;
+            auto knpck = pkt->removeAtFront<KN_Packet>();
+            if (strcmp(knpck->getKnEntry().trgApp.c_str(), appName.c_str())
+                    == 0) {
                 //this is a received inform
-                if(knpck->getKnEntry().type == 0){
+                if (knpck->getKnEntry().type == 0) {
                     //not used by this app
-                } else if(knpck->getKnEntry().type == 1) {
+                } else if (knpck->getKnEntry().type == 1) {
                     //this is a received request
-                    if (dynamic_cast<OFP_Packet_In *>(knpck->getKnEntry().payload) != NULL) {
-                        OFP_Packet_In *pckin = (OFP_Packet_In *) knpck->getKnEntry().payload;
-                        CommonHeaderFields headerFields = extractCommonHeaderFields(pckin);
 
-                        //check if we can find a route
+                    auto pktIn = dynamic_cast<Packet*>(knpck->getKnEntryForUpdate().payload);
+                    if (pktIn != nullptr) {
+                        auto chunk = pktIn->peekAtFront<Chunk>();
+                        if (dynamicPtrCast<const OFP_Packet_In>(chunk) != nullptr) {
+                            auto pckin = dynamicPtrCast<const OFP_Packet_In>(chunk);
+                            CommonHeaderFields headerFields = extractCommonHeaderFields(pktIn);
+                            //check if we can find a route
+                            //ignore lldp packets
+                            if (headerFields.eth_type == 0x88CC) {
+                                return;
+                            }
+                            //ignore arp requests
+                            if (ignoreArpRequests  && headerFields.eth_type == ETHERTYPE_ARP && pckin->getMatch().OFB_ARP_OP == ARP_REQUEST) {
+                                return;
+                            }
 
-                        //ignore lldp packets
-                        if(headerFields.eth_type == 0x88CC){
-                            return;
-                        }
+                            //compute path for non arps
+                            std::list<LLDPPathSegment> route;
+                            computePath(knpck->getKnEntry().srcSwitch, headerFields.dst_mac.str(), route);
 
-                        //ignore arp requests
-                        if(ignoreArpRequests && headerFields.eth_type == ETHERTYPE_ARP && pckin->getMatch().OFB_ARP_OP == ARP_REQUEST){
-                            return;
-                        }
+                            //if route empty flood
+                            if (route.empty()) {
+                                if (dropIfNoRouteFound && headerFields.eth_type != ETHERTYPE_ARP) {
+                                    //respond with a drop packet
+                                    KandooEntry entry2 = KandooEntry();
+                                    entry2.trgApp = "KN_LLDPForwarding";
+                                    entry2.srcApp = "KN_LLDPForwarding";
+                                    entry2.trgController = knpck->getKnEntry().srcController;
+                                    entry2.trgSwitch = knpck->getKnEntry().srcSwitch;
+                                    entry2.srcSwitch = "";
+                                    entry2.type = 2;
+                                    entry2.srcController = knpck->getKnEntry().trgController;
+                                    entry2.payload = createDropPacketFromPacketIn(pktIn);
 
+                                    knAgent->sendReply(pktKnpck, entry2);
+                                } else {
+                                    //respond with flood packet
+                                    KandooEntry entry = KandooEntry();
+                                    entry.trgApp = "KN_LLDPForwarding";
+                                    entry.srcApp = "KN_LLDPForwarding";
+                                    entry.trgController = knpck->getKnEntry().srcController;
+                                    entry.trgSwitch = knpck->getKnEntry().srcSwitch;
+                                    entry.srcSwitch = "";
+                                    entry.type = 2;
+                                    entry.srcController = knpck->getKnEntry().trgController;
+                                    entry.payload = createFloodPacketFromPacketIn(pktIn);
 
-                        //compute path for non arps
-                        std::list<LLDPPathSegment> route;
-                        computePath(knpck->getKnEntry().srcSwitch,headerFields.dst_mac.str(),route);
-
-                        //if route empty flood
-                        if(route.empty()){
-                            if(dropIfNoRouteFound && headerFields.eth_type != ETHERTYPE_ARP){
-                                //respond with a drop packet
-                                KandooEntry entry2 = KandooEntry();
-                                entry2.trgApp = "KN_LLDPForwarding";
-                                entry2.srcApp = "KN_LLDPForwarding";
-                                entry2.trgController = knpck->getKnEntry().srcController;
-                                entry2.trgSwitch = knpck->getKnEntry().srcSwitch;
-                                entry2.srcSwitch = "";
-                                entry2.type=2;
-                                entry2.srcController = knpck->getKnEntry().trgController;
-                                entry2.payload = createDropPacketFromPacketIn(pckin);
-
-                                knAgent->sendReply(knpck,entry2);
+                                    knAgent->sendReply(pktKnpck, entry);
+                                }
                             } else {
-                                //respond with flood packet
+                                //send packet to next hop
+                                LLDPPathSegment seg = route.front();
+                                route.pop_front();
+
+                                //packet out
                                 KandooEntry entry = KandooEntry();
                                 entry.trgApp = "KN_LLDPForwarding";
                                 entry.srcApp = "KN_LLDPForwarding";
                                 entry.trgController = knpck->getKnEntry().srcController;
                                 entry.trgSwitch = knpck->getKnEntry().srcSwitch;
                                 entry.srcSwitch = "";
-                                entry.type=2;
+                                entry.type = 2;
                                 entry.srcController = knpck->getKnEntry().trgController;
-                                entry.payload = createFloodPacketFromPacketIn(pckin);
+                                entry.payload = createPacketOutFromPacketIn(pktIn, seg.outport);
 
-                                knAgent->sendReply(knpck,entry);
-                            }
-                        } else {
-                            //send packet to next hop
-                            LLDPPathSegment seg = route.front();
-                            route.pop_front();
+                                knAgent->sendReply(pktKnpck, entry);
 
-                            //packet out
-                            KandooEntry entry = KandooEntry();
-                            entry.trgApp = "KN_LLDPForwarding";
-                            entry.srcApp = "KN_LLDPForwarding";
-                            entry.trgController = knpck->getKnEntry().srcController;
-                            entry.trgSwitch = knpck->getKnEntry().srcSwitch;
-                            entry.srcSwitch = "";
-                            entry.type=2;
-                            entry.srcController = knpck->getKnEntry().trgController;
-                            entry.payload = createPacketOutFromPacketIn(pckin,seg.outport);
-
-                            knAgent->sendReply(knpck,entry);
-
-                            //set flow mods for all switches under my controller's command
-                            oxm_basic_match match = oxm_basic_match();
-                            match.OFB_ETH_DST = headerFields.dst_mac;
-
-                            match.wildcards= 0;
-                            match.wildcards |= OFPFW_IN_PORT;
-                            match.wildcards |=  OFPFW_DL_SRC;
-                            match.wildcards |= OFPFW_DL_TYPE;
-
-
-                            entry = KandooEntry();
-                            entry.trgApp = "KN_LLDPForwarding";
-                            entry.srcApp = "KN_LLDPForwarding";
-                            entry.trgController = knpck->getKnEntry().srcController;
-                            entry.trgSwitch = knpck->getKnEntry().srcSwitch;
-                            entry.srcSwitch = "";
-                            entry.type=2;
-                            entry.srcController = knpck->getKnEntry().trgController;
-                            entry.payload = createFlowMod(OFPFC_ADD, match, seg.outport,idleTimeout,hardTimeout);
-
-                            knAgent->sendReply(knpck,entry);
-
-
-                            //iterate the rest of the route and set flow mods for switches under my control
-                            while(!route.empty()){
-                                seg = route.front();
-                                route.pop_front();
+                                //set flow mods for all switches under my controller's command
                                 oxm_basic_match match = oxm_basic_match();
                                 match.OFB_ETH_DST = headerFields.dst_mac;
 
-                                match.wildcards= 0;
+                                match.wildcards = 0;
                                 match.wildcards |= OFPFW_IN_PORT;
-                                match.wildcards |=  OFPFW_DL_SRC;
+                                match.wildcards |= OFPFW_DL_SRC;
                                 match.wildcards |= OFPFW_DL_TYPE;
 
                                 entry = KandooEntry();
                                 entry.trgApp = "KN_LLDPForwarding";
                                 entry.srcApp = "KN_LLDPForwarding";
                                 entry.trgController = knpck->getKnEntry().srcController;
-                                entry.trgSwitch = seg.chassisId;
+                                entry.trgSwitch = knpck->getKnEntry().srcSwitch;
                                 entry.srcSwitch = "";
-                                entry.type=2;
+                                entry.type = 2;
                                 entry.srcController = knpck->getKnEntry().trgController;
-                                entry.payload = createFlowMod(OFPFC_ADD, match, seg.outport,idleTimeout,hardTimeout);
+                                entry.payload = createFlowMod(OFPFC_ADD, match, seg.outport, idleTimeout, hardTimeout);
 
-                                knAgent->sendReplyToSwitchAuthoritive(seg.chassisId,entry);
+                                knAgent->sendReply(pktKnpck, entry);
+
+                                //iterate the rest of the route and set flow mods for switches under my control
+                                while (!route.empty()) {
+                                    seg = route.front();
+                                    route.pop_front();
+                                    oxm_basic_match match = oxm_basic_match();
+                                    match.OFB_ETH_DST = headerFields.dst_mac;
+
+                                    match.wildcards = 0;
+                                    match.wildcards |= OFPFW_IN_PORT;
+                                    match.wildcards |= OFPFW_DL_SRC;
+                                    match.wildcards |= OFPFW_DL_TYPE;
+
+                                    entry = KandooEntry();
+                                    entry.trgApp = "KN_LLDPForwarding";
+                                    entry.srcApp = "KN_LLDPForwarding";
+                                    entry.trgController = knpck->getKnEntry().srcController;
+                                    entry.trgSwitch = seg.chassisId;
+                                    entry.srcSwitch = "";
+                                    entry.type = 2;
+                                    entry.srcController = knpck->getKnEntry().trgController;
+                                    entry.payload = createFlowMod(OFPFC_ADD, match, seg.outport, idleTimeout, hardTimeout);
+
+                                    knAgent->sendReplyToSwitchAuthoritive(seg.chassisId, entry);
+                                }
                             }
                         }
-
                     }
 
-                } else if(knpck->getKnEntry().type == 2) {
+                } else if (knpck->getKnEntry().type == 2) {
                     //this is a received reply
-                    if(dynamic_cast<OFP_Packet_Out *>(knpck->getKnEntry().payload) != NULL){
-                        OFP_Packet_Out *pckout = (OFP_Packet_Out *) knpck->getKnEntry().payload;
-                        controller->sendPacketOut(pckout->dup(),controller->findSocketForChassisId(knpck->getKnEntry().trgSwitch));
-                    } else if (dynamic_cast<OFP_Flow_Mod *>(knpck->getKnEntry().payload) != NULL){
-                        OFP_Flow_Mod *pckout = (OFP_Flow_Mod *) knpck->getKnEntry().payload;
-                        controller->sendPacketOut(pckout->dup(),controller->findSocketForChassisId(knpck->getKnEntry().trgSwitch));
+                    auto pktOut = dynamic_cast<Packet*>(knpck->getKnEntryForUpdate().payload);
+                    if (pktOut != nullptr) {
+                        auto chunk = pktOut->peekAtFront<Chunk>();
+                        if (dynamicPtrCast<const OFP_Packet_Out>(chunk) != nullptr) {
+                            controller->sendPacketOut(pktOut->dup(), controller->findSocketForChassisId(knpck->getKnEntry().trgSwitch));
+                        }
+                        else if (dynamicPtrCast<const OFP_Flow_Mod>(chunk) != nullptr) {
+                            controller->sendPacketOut(pktOut->dup(), controller->findSocketForChassisId(knpck->getKnEntry().trgSwitch));
+                        }
                     }
                 }
             }
+            pkt->insertAtFront(knpck);
         }
     }
 }

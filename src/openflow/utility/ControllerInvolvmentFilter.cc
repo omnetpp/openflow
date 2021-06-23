@@ -5,11 +5,15 @@ Define_Module(ControllerInvolvementFilter);
 
 
 void ControllerInvolvementFilter::initialize(int stage) {
-    cpPingPacketHash = registerSignal("cpPingPacketHash");
-    getParentModule()->subscribe("cpPingPacketHash",this);
+    OperationalBase::initialize(stage);
+    if (stage == INITSTAGE_LOCAL) {
+        cpPingPacketHash = registerSignal("cpPingPacketHash");
+        getParentModule()->subscribe("cpPingPacketHash",this);
+    }
 }
 
 void ControllerInvolvementFilter::receiveSignal(cComponent *source, simsignal_t signalID, unsigned long l, cObject *details) {
+    Enter_Method("ControllerInvolvementFilter::receiveSignal %s", cComponent::getSignalName(signalID));
     if(signalID==cpPingPacketHash){
         if(controllerInvolvements.count(l) <=0){
             controllerInvolvements.insert(std::pair<long,int>(l,1));
@@ -19,7 +23,7 @@ void ControllerInvolvementFilter::receiveSignal(cComponent *source, simsignal_t 
     }
 }
 
-void ControllerInvolvementFilter::handleMessage(cMessage *msg) {
+void ControllerInvolvementFilter::handleMessageWhenUp(cMessage *msg) {
     error("this module doesn't handle messages, it runs only in initialize()");
 }
 

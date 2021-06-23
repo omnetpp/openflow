@@ -16,7 +16,7 @@
 package scenarios.networks;
 
 import inet.common.misc.ThruputMeteringChannel;
-import inet.networklayer.configurator.ipv4.IPv4NetworkConfigurator;
+import inet.networklayer.configurator.ipv4.Ipv4NetworkConfigurator;
 import openflow.hyperflow.Hyper_Flow_Synchronizer;
 import openflow.nodes.DistanceChannel;
 import openflow.nodes.Open_Flow_Domain;
@@ -39,7 +39,7 @@ network Scenario_Cesnet200603
             thruputDisplayFormat = "u";
         }
     submodules:
-        configurator: IPv4NetworkConfigurator {
+        configurator: Ipv4NetworkConfigurator {
             parameters:
                 @display("p=449,598");
         }

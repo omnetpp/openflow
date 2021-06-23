@@ -45,7 +45,7 @@ struct ltmatch{
 class Flow_Table_Entry {
     public:
         Flow_Table_Entry();
-        Flow_Table_Entry(OFP_Flow_Mod *flowModMsg);
+        Flow_Table_Entry(const OFP_Flow_Mod *flowModMsg);
 
         flow_table_cookie getCookie() const;
         flow_table_counters getCounters() const;

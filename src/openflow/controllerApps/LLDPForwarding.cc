@@ -1,7 +1,10 @@
+
 #include "openflow/controllerApps/LLDPForwarding.h"
 #include <algorithm>
 #include <string>
 #include <queue>
+#include "inet/linklayer/ethernet/common/Ethernet.h"
+#include "inet/linklayer/ethernet/common/EthernetMacHeader_m.h"
 
 using namespace std;
 
@@ -22,29 +25,30 @@ LLDPForwarding::~LLDPForwarding(){
 
 }
 
-void LLDPForwarding::initialize(){
-    AbstractControllerApp::initialize();
-    dropIfNoRouteFound = par("dropIfNoRouteFound");
-    ignoreArpRequests = par("ignoreArpRequests");
-    printMibGraph = par("printMibGraph");
-    lldpAgent = NULL;
-    version = -1;
-    versionHit = 0;
-    versionMiss = 0;
-    cacheHit = 0;
-    cacheMiss = 0;
-
-    idleTimeout = par("flowModIdleTimeOut");
-    hardTimeout= par("flowModHardTimeOut");
-
+void LLDPForwarding::initialize(int stage){
+    AbstractControllerApp::initialize(stage);
+    if (stage == INITSTAGE_LOCAL) {
+        dropIfNoRouteFound = par("dropIfNoRouteFound");
+        ignoreArpRequests = par("ignoreArpRequests");
+        printMibGraph = par("printMibGraph");
+        lldpAgent = NULL;
+        version = -1;
+        versionHit = 0;
+        versionMiss = 0;
+        cacheHit = 0;
+        cacheMiss = 0;
+        idleTimeout = par("flowModIdleTimeOut");
+        hardTimeout= par("flowModHardTimeOut");
+    }
 }
 
 
 
-void LLDPForwarding::handlePacketIn(OFP_Packet_In * packet_in_msg){
+void LLDPForwarding::handlePacketIn(Packet *pktInt){
     //get some details
-    CommonHeaderFields headerFields = extractCommonHeaderFields(packet_in_msg);
+    CommonHeaderFields headerFields = extractCommonHeaderFields(pktInt);
 
+    auto packet_in_msg = pktInt->peekAtFront<OFP_Packet_In>();
     //ignore lldp packets
     if(headerFields.eth_type == 0x88CC){
         return;
@@ -63,16 +67,16 @@ void LLDPForwarding::handlePacketIn(OFP_Packet_In * packet_in_msg){
     //if route empty flood
     if(route.empty()){
         if(dropIfNoRouteFound && headerFields.eth_type != ETHERTYPE_ARP){
-            dropPacket(packet_in_msg);
+            dropPacket(pktInt);
         } else {
-            floodPacket(packet_in_msg);
+            floodPacket(pktInt);
         }
     }else {
         std::string computedRoute = "";
         //send packet to next hop
         LLDPPathSegment seg = route.front();
         route.pop_front();
-        sendPacket(packet_in_msg,seg.outport);
+        sendPacket(pktInt, seg.outport);
 
         //set flow mods for all switches under my controller's command
         oxm_basic_match match = oxm_basic_match();
@@ -83,7 +87,7 @@ void LLDPForwarding::handlePacketIn(OFP_Packet_In * packet_in_msg){
         match.wildcards |=  OFPFW_DL_SRC;
         match.wildcards |= OFPFW_DL_TYPE;
 
-        TCPSocket * socket = controller->findSocketFor(packet_in_msg);
+        auto socket = controller->findSocketFor(pktInt);
         sendFlowModMessage(OFPFC_ADD, match, seg.outport, socket,idleTimeout,hardTimeout);
 
         //concatenate route
@@ -103,7 +107,7 @@ void LLDPForwarding::handlePacketIn(OFP_Packet_In * packet_in_msg){
 
             computedRoute += seg.chassisId + " -> ";
 
-            TCPSocket * socket = controller->findSocketForChassisId(seg.chassisId);
+            auto socket = controller->findSocketForChassisId(seg.chassisId);
             //is switch under our control
             if(socket != NULL){
                 sendFlowModMessage(OFPFC_ADD, match, seg.outport, socket,idleTimeout,hardTimeout);
@@ -124,6 +128,7 @@ void LLDPForwarding::receiveSignal(cComponent *src, simsignal_t id, cObject *obj
     AbstractControllerApp::receiveSignal(src,id,obj,details);
 
     //set lldp link
+    Enter_Method("LLDPForwarding::receiveSignal %s", cComponent::getSignalName(id));
     if(lldpAgent == NULL && controller != NULL){
         auto appList = controller->getAppList();
 
@@ -138,9 +143,14 @@ void LLDPForwarding::receiveSignal(cComponent *src, simsignal_t id, cObject *obj
 
     if(id == PacketInSignalId){
         EV << "LLDPForwarding::PacketIn" << '\n';
-        if (dynamic_cast<OFP_Packet_In *>(obj) != NULL) {
-            OFP_Packet_In *packet_in_msg = (OFP_Packet_In *) obj;
-            handlePacketIn(packet_in_msg);
+        auto pkt = dynamic_cast<Packet *>(obj);
+        if (pkt == nullptr)
+            return;
+        auto chunk = pkt->peekAtFront<Chunk>();
+        auto packet_in_msg = dynamicPtrCast<const OFP_Packet_In>(chunk);
+
+        if (packet_in_msg != nullptr) {
+            handlePacketIn(pkt);
         }
     }
 }

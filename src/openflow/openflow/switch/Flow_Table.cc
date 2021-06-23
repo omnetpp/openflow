@@ -1,7 +1,7 @@
 #include <omnetpp.h>
-#include "inet/linklayer/ethernet/EtherFrame_m.h"
-#include "inet/linklayer/common/MACAddress.h"
-#include "inet/networklayer/arp/ipv4/ARPPacket_m.h"
+#include "inet/linklayer/ethernet/common/EthernetMacHeader_m.h"
+#include "inet/linklayer/common/MacAddress.h"
+#include "inet/networklayer/arp/ipv4/ArpPacket_m.h"
 #include "openflow/openflow/switch/Flow_Table.h"
 
 using namespace std;

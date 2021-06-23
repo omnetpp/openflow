@@ -1,6 +1,7 @@
 #include "openflow/kandoo/KN_LLDPAgent.h"
 #include <algorithm>
-
+#include "inet/protocolelement/fragmentation/tag/FragmentTag_m.h"
+#include "inet/linklayer/ethernet/common/EthernetMacHeader_m.h"
 
 #define MSGKIND_TRIGGERLLDP 101
 #define MSGKIND_LLDPAGENTBOOTED 201
@@ -15,33 +16,29 @@ KN_LLDPAgent::~KN_LLDPAgent(){
 
 }
 
-void KN_LLDPAgent::initialize(){
-    LLDPAgent::initialize();
-    kandooAgent = NULL;
-
-    appName = "KN_LLDPAgent";
-
-    //register signals
-    kandooEventSignalId =registerSignal("KandooEvent");
-    getParentModule()->subscribe("KandooEvent",this);
-
+void KN_LLDPAgent::initialize(int stage){
+    LLDPAgent::initialize(stage);
+    if (stage == INITSTAGE_LOCAL) {
+        kandooAgent = NULL;
+        appName = "KN_LLDPAgent";
+        //register signals
+        kandooEventSignalId =registerSignal("KandooEvent");
+        getParentModule()->subscribe("KandooEvent",this);
+    }
 }
 
-
-
-
-
-
-void KN_LLDPAgent::handlePacketIn(OFP_Packet_In * packet_in_msg){
+void KN_LLDPAgent::handlePacketIn(Packet *pktIn){
     //check if it is a received lldp
-    CommonHeaderFields headerFields = extractCommonHeaderFields(packet_in_msg);
-
+    CommonHeaderFields headerFields = extractCommonHeaderFields(pktIn);
     //check if it is an lldp packet
     if(headerFields.eth_type == 0x88CC){
-        EthernetIIFrame *frame =  dynamic_cast<EthernetIIFrame *>(packet_in_msg->getEncapsulatedPacket());
+        auto& fragmentTag = pktIn->getTag<FragmentTag>();
+
         //check if we have received the entire frame, if not the flow mods have not been sent yet
-        if(frame != NULL){
-            LLDP *lldp = (LLDP *) frame->getEncapsulatedPacket();
+        if(fragmentTag->getLastFragment()){
+            auto packet_in_msg = pktIn->removeAtFront<OFP_Packet_In>();
+            auto header =  pktIn->removeAtFront<EthernetMacHeader>();
+            auto lldp = pktIn->peekAtFront<LLDP>();
             mibGraph.addEntry(lldp->getChassisID(),lldp->getPortID(),headerFields.swInfo->getMacAddress(),headerFields.inport,timeOut);
             if(printMibGraph){
                 EV << mibGraph.getStringGraph() << endl;
@@ -67,12 +64,13 @@ void KN_LLDPAgent::handlePacketIn(OFP_Packet_In * packet_in_msg){
 
                 kandooAgent->sendRequest(entry);
             }
+            pktIn->insertAtFront(header);
+            pktIn->insertAtFront(packet_in_msg);
 
         } else {
             //resend flow mod
             triggerFlowMod(headerFields.swInfo);
         }
-
      } else {
          //this could be a packet originating from an end device, check if the port is associated with an lldp entry
 

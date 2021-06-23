@@ -5,7 +5,7 @@
 
 #include <deque>
 #include <map>
-#include "inet/linklayer/ethernet/EtherFrame_m.h"
+#include "inet/common/packet/Packet.h"
 
 
 using namespace std;
@@ -18,15 +18,15 @@ public:
     Buffer(int cap);
     ~Buffer();
     bool isfull();
-    uint32_t storeMessage(EthernetIIFrame *msg);
-    bool deleteMessage(EthernetIIFrame *msg);
-    EthernetIIFrame *returnMessage(uint32_t buffer_id);
+    uint32_t storeMessage(Packet *msg);
+    bool deleteMessage(Packet *msg);
+    Packet *returnMessage(uint32_t buffer_id);
     uint32_t getCapacity();
     int size();
 
 
 protected:
-    std::map<uint32_t, EthernetIIFrame *> pending_msgs;
+    std::map<uint32_t, Packet *> pending_msgs;
     uint32_t capacity;
     uint32_t next_buffer_id;
 };

@@ -3,7 +3,7 @@
 package openflow.nodes;
 
 import inet.common.misc.ThruputMeteringChannel;
-import inet.node.ethernet.EtherSwitch;
+import inet.node.ethernet.EthernetSwitch;
 import inet.node.inet.StandardHost;
 import openflow.openflow.switch.Open_Flow_Switch;
 
@@ -41,7 +41,7 @@ module Fat_Tree
             @display("p=306,306,row,90");
         }
 
-        etherSwitch: EtherSwitch {
+        etherSwitch: EthernetSwitch {
             @display("p=79,200");
         }
 

@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <string>
 #include <queue>
+#include "inet/linklayer/ethernet/common/Ethernet.h"
+#include "inet/linklayer/ethernet/common/EthernetMacHeader_m.h"
 
 using namespace std;
 
@@ -22,33 +24,37 @@ LLDPBalancedMinHop::~LLDPBalancedMinHop(){
 
 }
 
-void LLDPBalancedMinHop::initialize(){
-    AbstractControllerApp::initialize();
-    dropIfNoRouteFound = par("dropIfNoRouteFound");
-    ignoreArpRequests = par("ignoreArpRequests");
-    printMibGraph = par("printMibGraph");
-    lldpAgent = NULL;
-
-    version = -1;
-    versionHit = 0;
-    versionMiss = 0;
-    cacheHit = 0;
-    cacheMiss = 0;
-
-    idleTimeout = par("flowModIdleTimeOut");
-    hardTimeout = par("flowModHardTimeOut");
+void LLDPBalancedMinHop::initialize(int stage){
+    AbstractControllerApp::initialize(stage);
+    if (stage == INITSTAGE_LOCAL) {
+        dropIfNoRouteFound = par("dropIfNoRouteFound");
+        ignoreArpRequests = par("ignoreArpRequests");
+        printMibGraph = par("printMibGraph");
+        lldpAgent = NULL;
+        version = -1;
+        versionHit = 0;
+        versionMiss = 0;
+        cacheHit = 0;
+        cacheMiss = 0;
+        idleTimeout = par("flowModIdleTimeOut");
+        hardTimeout = par("flowModHardTimeOut");
+    }
 }
 
 
 
-void LLDPBalancedMinHop::handlePacketIn(OFP_Packet_In * packet_in_msg){
+//void LLDPBalancedMinHop::handlePacketIn(OFP_Packet_In * packet_in_msg){
+void LLDPBalancedMinHop::handlePacketIn(Packet *pkt){
 
-    CommonHeaderFields headerFields = extractCommonHeaderFields(packet_in_msg);
+
+    CommonHeaderFields headerFields = extractCommonHeaderFields(pkt);
 
     //ignore lldp packets
     if(headerFields.eth_type == 0x88CC){
         return;
     }
+    auto packet_in_msg = pkt->peekAtFront<OFP_Packet_In>();
+
 
     //ignore arp requests
     if(ignoreArpRequests && headerFields.eth_type == ETHERTYPE_ARP && packet_in_msg->getMatch().OFB_ARP_OP == ARP_REQUEST){
@@ -62,15 +68,15 @@ void LLDPBalancedMinHop::handlePacketIn(OFP_Packet_In * packet_in_msg){
     //if route empty flood
     if(route.empty()){
         if(dropIfNoRouteFound && headerFields.eth_type != ETHERTYPE_ARP){
-            dropPacket(packet_in_msg);
+            dropPacket(pkt);
         } else {
-            floodPacket(packet_in_msg);
+            floodPacket(pkt);
         }
     }else {
         //send packet to next hop
         LLDPPathSegment seg = route.front();
         route.pop_front();
-        sendPacket(packet_in_msg,seg.outport);
+        sendPacket(pkt, seg.outport);
 
         //set flow mods for all switches under my controller's command
         oxm_basic_match match = oxm_basic_match();
@@ -82,7 +88,7 @@ void LLDPBalancedMinHop::handlePacketIn(OFP_Packet_In * packet_in_msg){
         match.wildcards |= OFPFW_DL_TYPE;
 
 
-        sendFlowModMessage(OFPFC_ADD, match, seg.outport, controller->findSocketFor(packet_in_msg),idleTimeout,hardTimeout);
+        sendFlowModMessage(OFPFC_ADD, match, seg.outport, controller->findSocketFor(pkt),idleTimeout,hardTimeout);
 
         //iterate the rest of the route and set flow mods for switches under my control
         while(!route.empty()){
@@ -97,16 +103,13 @@ void LLDPBalancedMinHop::handlePacketIn(OFP_Packet_In * packet_in_msg){
             match.wildcards |= OFPFW_DL_TYPE;
 
 
-            TCPSocket * socket = controller->findSocketForChassisId(seg.chassisId);
+            auto socket = controller->findSocketForChassisId(seg.chassisId);
             //is switch under our control
             if(socket != NULL){
                 sendFlowModMessage(OFPFC_ADD, match, seg.outport, socket,idleTimeout,hardTimeout);
             }
         }
-
-
     }
-
 }
 
 
@@ -116,6 +119,7 @@ void LLDPBalancedMinHop::receiveSignal(cComponent *src, simsignal_t id, cObject 
     AbstractControllerApp::receiveSignal(src,id,obj,details);
 
     //set lldp link
+    Enter_Method("LLDPBalancedMinHop::receiveSignal %s", cComponent::getSignalName(id));
     if(lldpAgent == NULL && controller != NULL){
         auto appList = controller->getAppList();
 
@@ -130,9 +134,13 @@ void LLDPBalancedMinHop::receiveSignal(cComponent *src, simsignal_t id, cObject 
 
     if(id == PacketInSignalId){
         EV << "LLDPBalancedMinHop::PacketIn" << endl;
-        if (dynamic_cast<OFP_Packet_In *>(obj) != NULL) {
-            OFP_Packet_In *packet_in_msg = (OFP_Packet_In *) obj;
-            handlePacketIn(packet_in_msg);
+        auto pkt = dynamic_cast<Packet *>(obj);
+        if (pkt == nullptr)
+            return;
+        auto chunk = pkt->peekAtFront<Chunk>();
+        auto packet_in_msg = dynamicPtrCast<const OFP_Packet_In>(chunk);
+        if (packet_in_msg != nullptr) {
+            handlePacketIn(pkt);
         }
     }
 }

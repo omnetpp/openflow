@@ -4,13 +4,13 @@
 
 #include <omnetpp.h>
 #include "openflow/controllerApps/AbstractTCPControllerApp.h"
-#include "inet/transportlayer/contract/tcp/TCPSocket.h"
+#include "inet/transportlayer/contract/tcp/TcpSocket.h"
 #include "openflow/messages/KN_Packet_m.h"
 
 struct SwitchControllerMapping {
     std::string switchId;
     std::string controllerId;
-    TCPSocket *socket;
+    TcpSocket *socket;
 };
 
 class KandooAgent:public AbstractTCPControllerApp {
@@ -23,17 +23,19 @@ public:
     bool getIsRootController();
 
     void sendRequest(KandooEntry entry);
-    void sendReply(KN_Packet * knpck,KandooEntry entry);
+    void sendReply(Packet * knpck,KandooEntry entry);
 
-    void handleKandooPacket(KN_Packet * knpck);
+    void handleKandooPacket(Packet * knpck);
 
     void sendReplyToSwitchAuthoritive(std::string switchId, KandooEntry entry);
 
 protected:
 
-    void initialize();
-    virtual void handleMessage(cMessage *msg);
-    virtual void processQueuedMsg(cMessage *data_msg);
+    virtual void initialize(int stage) override;
+    virtual void handleMessageWhenUp(cMessage *msg) override;
+    virtual void processQueuedMsg(Packet *data_msg) override;
+
+    virtual void handleStartOperation(LifecycleOperation *operation) override;
 
     bool isRootController;
 

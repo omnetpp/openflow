@@ -5,8 +5,8 @@ import inet.linklayer.ethernet.EthernetInterface;
 import inet.networklayer.common.InterfaceTable;
 import inet.networklayer.contract.INetworkLayer;
 import inet.networklayer.contract.IRoutingTable;
-import inet.transportlayer.contract.ITCP;
-
+import inet.transportlayer.contract.ITcp;
+import inet.common.MessageDispatcher;
 
 //
 // TODO documentation
@@ -16,10 +16,10 @@ module Hyper_Flow_Synchronizer
     parameters:
         @networkNode();
         @labels(node,ethernet-node);
-        @display("i=device/server;bgb=582,213;i2=openflow/OpenFlow-Logo-small");
-
+        @display("i=device/server;bgb=840,433;i2=openflow/OpenFlow-Logo-small");
+        bool hasTcp = default(firstAvailableOrEmpty("Tcp", "TcpLwip", "TcpNsc") != "");
 		//submodules
-        string tcpType = default("TCP");  // tcp implementation (e.g. TCP, TCP_old, TCP_NSC)
+        //string tcpType = default("TCP");  // tcp implementation (e.g. TCP, TCP_old, TCP_NSC)
         int numExtInterfaces = default(0);
         double serviceTime @unit("s") = default(0s);
 
@@ -34,49 +34,83 @@ module Hyper_Flow_Synchronizer
         routingTable.multicastForwarding = multicastForwarding;   // for IPv4, IPv6, Generic
         *.routingTableModule = default(absPath(".routingTable"));
         *.interfaceTableModule = default(absPath(".interfaceTable"));
- 
+
     gates:
         inout ethg[] @labels(EtherFrame-conn);
 
     submodules:
+
+        at: MessageDispatcher {
+            parameters:
+                @display("p=400,101;b=580,5,,,,1");
+        }
+        tn: MessageDispatcher {
+            parameters:
+                @display("p=400,200;b=580,5,,,,1");
+        }
+        nl: MessageDispatcher {
+            parameters:
+                @display("p=400,300;b=580,5,,,,1");
+        }
+        li: MessageDispatcher {
+            parameters:
+                @display("p=400,348;b=580,5,,,,1");
+        }
+
         interfaceTable: InterfaceTable {
             parameters:
-                @display("p=422,35");
+                @display("p=63,249");
         }
-        tcp: <tcpType> like ITCP {
+
+        tcp: <default(firstAvailableOrEmpty("Tcp", "TcpLwip", "TcpNsc"))> like ITcp if hasTcp {
             parameters:
-                @display("p=246,138");
+                @display("p=360,142");
         }
-        routingTable: <routingTableType> like IRoutingTable if routingTableType != "" {
+        ipv4: <default("Ipv4NetworkLayer")> like INetworkLayer {
             parameters:
-                @display("p=53,250;is=s");
-        }
-        networkLayer: <networkLayerType> like INetworkLayer {
-            parameters:
-                @display("p=355,278;q=queue");
-            gates:
-                ifIn[sizeof(ethg)];
-                ifOut[sizeof(ethg)];
+                @display("p=352,249;q=queue");
         }
         eth[sizeof(ethg)]: EthernetInterface {
             parameters:
-                @display("p=432,138,row,90;q=txQueue");
+                @display("p=491,399,row,90;q=txQueue");
         }
         HyperFlowSynchronizer: HyperFlowSynchronizer {
-            @display("p=89,138");
+            @display("p=213,44");
         }
     connections allowunconnected:
-        tcp.ipOut --> networkLayer.transportIn++;
-        tcp.ipIn <-- networkLayer.transportOut++;
+
+        at.out++ --> tn.in++;
+        at.in++ <-- tn.out++;
+
+        tn.out++ --> nl.in++;
+        tn.in++ <-- nl.out++;
+
+        nl.out++ --> li.in++;
+        nl.in++ <-- li.out++;
+
+        at.out++ --> tcp.appIn;
+        at.in++ <-- tcp.appOut;
+
+        tcp.ipOut --> tn.in++;
+        tcp.ipIn <-- tn.out++;
+
+        ipv4.ifIn <-- nl.out++;
+        ipv4.ifOut --> nl.in++;
+
+        tn.out++ --> ipv4.transportIn;
+        tn.in++ <-- ipv4.transportOut;
 
         for i=0..sizeof(ethg)-1 {
-            ethg[i] <--> eth[i].phys;
-            eth[i].upperLayerOut --> networkLayer.ifIn[i];
-            eth[i].upperLayerIn <-- networkLayer.ifOut[i];
+            eth[i].upperLayerOut --> li.in++;
+            eth[i].upperLayerIn <-- li.out++;
         }
 
-        tcp.appOut++ --> HyperFlowSynchronizer.tcpIn;
-        HyperFlowSynchronizer.tcpOut --> tcp.appIn++;
+        for i=0..sizeof(ethg)-1 {
+            ethg[i] <--> { @display("m=s"); } <--> eth[i].phys;
+        }
+
+        at.out++ --> HyperFlowSynchronizer.socketIn;
+        HyperFlowSynchronizer.socketOut --> at.in++;
 }
 
 

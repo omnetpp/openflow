@@ -2,16 +2,17 @@
 #ifndef OPENFLOWGRAPHANALYZER_H_
 #define OPENFLOWGRAPHANALYZER_H_
 
-#include <omnetpp.h>
+#include "inet/common/lifecycle/OperationalBase.h"
+#include "inet/common/lifecycle/ModuleOperations.h"
 #include "openflow/openflow/switch/OF_Switch.h"
 
 class Node;
 
-class OpenFlowGraphAnalyzer : public cSimpleModule
+class OpenFlowGraphAnalyzer : public OperationalBase
 {
 
 public:
-    virtual void finish();
+    virtual void finish() override;
 
 
 protected:
@@ -32,9 +33,18 @@ protected:
         std::map<std::string,int> clMap;
 
 
-        virtual int numInitStages() const  {return NUM_INIT_STAGES;}
-        virtual void initialize(int stage);
-        virtual void handleMessage(cMessage *msg);
+        virtual void initialize(int stage) override;
+        virtual void handleMessageWhenUp(cMessage *msg) override;
+
+        // Lifecycle methods
+        virtual void handleStartOperation(LifecycleOperation *operation) override {};
+        virtual void handleStopOperation(LifecycleOperation *operation) override {};
+        virtual void handleCrashOperation(LifecycleOperation *operation) override {};
+
+        virtual bool isInitializeStage(int stage) override { return stage == INITSTAGE_APPLICATION_LAYER; }
+        virtual bool isModuleStartStage(int stage) override { return stage == ModuleStartOperation::STAGE_APPLICATION_LAYER; }
+        virtual bool isModuleStopStage(int stage) override { return stage == ModuleStopOperation::STAGE_APPLICATION_LAYER; }
+
 };
 
 

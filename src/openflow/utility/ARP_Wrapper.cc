@@ -19,10 +19,10 @@ void ARP_Wrapper::setSrcIp(const string& srcIp){
     this->srcIp = srcIp;
 }
 
-const MACAddress& ARP_Wrapper::getSrcMacAddress() const{
+const MacAddress& ARP_Wrapper::getSrcMacAddress() const{
     return this->srcMac;
 }
 
-void ARP_Wrapper::setSrcMacAddress(const MACAddress& macAddress){
+void ARP_Wrapper::setSrcMacAddress(const MacAddress& macAddress){
     this->srcMac = macAddress;
 }

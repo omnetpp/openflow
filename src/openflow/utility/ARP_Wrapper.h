@@ -4,7 +4,7 @@
 #define ARP_WRAPPER_H_
 
 #include <omnetpp.h>
-#include "inet/linklayer/common/MACAddress.h"
+#include "inet/linklayer/common/MacAddress.h"
 
 using namespace std;
 using namespace inet;
@@ -18,14 +18,14 @@ public:
     const string& getSrcIp() const;
     void setSrcIp(const string& srcIp);
 
-    const MACAddress& getSrcMacAddress() const;
-    void setSrcMacAddress(const MACAddress& macAddress);
+    const MacAddress& getSrcMacAddress() const;
+    void setSrcMacAddress(const MacAddress& macAddress);
 
 
 
 protected:
     string srcIp;
-    MACAddress srcMac;
+    MacAddress srcMac;
 };
 
 

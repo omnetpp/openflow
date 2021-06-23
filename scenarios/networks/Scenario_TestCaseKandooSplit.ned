@@ -3,8 +3,8 @@
 package scenarios.networks;
 
 import inet.common.misc.ThruputMeteringChannel;
-import inet.networklayer.configurator.ipv4.IPv4NetworkConfigurator;
-import inet.node.ethernet.EtherSwitch;
+import inet.networklayer.configurator.ipv4.Ipv4NetworkConfigurator;
+import inet.node.ethernet.EthernetSwitch;
 import inet.node.inet.StandardHost;
 import openflow.openflow.controller.Open_Flow_Controller;
 import openflow.openflow.switch.Open_Flow_Switch;
@@ -44,7 +44,7 @@ network Scenario_TestCaseKandooSplit
         clientG2[numClients]: StandardHost {
             @display("p=848,354");
         }
-        configurator: IPv4NetworkConfigurator {
+        configurator: Ipv4NetworkConfigurator {
             parameters:
                 @display("p=61,172");
         }
@@ -63,7 +63,7 @@ network Scenario_TestCaseKandooSplit
         }
 
 
-        etherSwitch: EtherSwitch {
+        etherSwitch: EthernetSwitch {
             @display("p=468,133");
         }
 

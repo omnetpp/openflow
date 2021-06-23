@@ -1,7 +1,8 @@
 #include "openflow/kandoo/KN_LLDPBalancedMinHop.h"
 #include <algorithm>
 #include <string>
-
+#include "inet/linklayer/ethernet/common/Ethernet.h"
+#include "inet/linklayer/ethernet/common/EthernetMacHeader_m.h"
 
 Define_Module(KN_LLDPBalancedMinHop);
 
@@ -14,29 +15,30 @@ KN_LLDPBalancedMinHop::~KN_LLDPBalancedMinHop(){
 
 }
 
-void KN_LLDPBalancedMinHop::initialize(){
-    LLDPBalancedMinHop::initialize();
-
-
-    knAgent = NULL;
-    appName="KN_LLDPBalancedMinHop";
-
-    //register signals
-    kandooEventSignalId =registerSignal("KandooEvent");
-    getParentModule()->subscribe("KandooEvent",this);
-
+void KN_LLDPBalancedMinHop::initialize(int stage){
+    LLDPBalancedMinHop::initialize(stage);
+    if (stage == INITSTAGE_LOCAL) {
+        knAgent = NULL;
+        appName="KN_LLDPBalancedMinHop";
+        //register signals
+        kandooEventSignalId =registerSignal("KandooEvent");
+        getParentModule()->subscribe("KandooEvent",this);
+    }
 }
 
 
 
-void KN_LLDPBalancedMinHop::handlePacketIn(OFP_Packet_In * packet_in_msg){
+void KN_LLDPBalancedMinHop::handlePacketIn(Packet * pktIn){
     //get some details
-    CommonHeaderFields headerFields = extractCommonHeaderFields(packet_in_msg);
+    CommonHeaderFields headerFields = extractCommonHeaderFields(pktIn);
+
 
     //ignore lldp packets
     if(headerFields.eth_type == 0x88CC){
         return;
     }
+
+    auto packet_in_msg = pktIn->peekAtFront<OFP_Packet_In>();
 
     //ignore arp requests
     if(ignoreArpRequests && headerFields.eth_type == ETHERTYPE_ARP && packet_in_msg->getMatch().OFB_ARP_OP == ARP_REQUEST){
@@ -59,15 +61,15 @@ void KN_LLDPBalancedMinHop::handlePacketIn(OFP_Packet_In * packet_in_msg){
             entry.srcSwitch = headerFields.swInfo->getMacAddress();
             entry.type=1;
             entry.srcController = controller->getFullPath();
-            entry.payload = packet_in_msg->dup();
+            entry.payload = pktIn->dup();
 
             knAgent->sendRequest(entry);
 
         } else {
             if(dropIfNoRouteFound && headerFields.eth_type != ETHERTYPE_ARP){
-                dropPacket(packet_in_msg);
+                dropPacket(pktIn);
             } else {
-                floodPacket(packet_in_msg);
+                floodPacket(pktIn);
             }
         }
 
@@ -76,7 +78,7 @@ void KN_LLDPBalancedMinHop::handlePacketIn(OFP_Packet_In * packet_in_msg){
         //send packet to next hop
         LLDPPathSegment seg = route.front();
         route.pop_front();
-        sendPacket(packet_in_msg,seg.outport);
+        sendPacket(pktIn, seg.outport);
 
         //set flow mods for all switches under my controller's command
         oxm_basic_match match = oxm_basic_match();
@@ -87,7 +89,7 @@ void KN_LLDPBalancedMinHop::handlePacketIn(OFP_Packet_In * packet_in_msg){
         match.wildcards |= OFPFW_IN_PORT;
         match.wildcards |= OFPFW_DL_TYPE;
 
-        TCPSocket * socket = controller->findSocketFor(packet_in_msg);
+        TcpSocket * socket = controller->findSocketFor(pktIn);
         sendFlowModMessage(OFPFC_ADD, match, seg.outport, socket,idleTimeout,hardTimeout);
 
         //concatenate route
@@ -107,7 +109,7 @@ void KN_LLDPBalancedMinHop::handlePacketIn(OFP_Packet_In * packet_in_msg){
 
             computedRoute += seg.chassisId + " -> ";
 
-            TCPSocket * socket = controller->findSocketForChassisId(seg.chassisId);
+            TcpSocket * socket = controller->findSocketForChassisId(seg.chassisId);
             //is switch under our control
             if(socket != NULL){
                 sendFlowModMessage(OFPFC_ADD, match, seg.outport, socket,idleTimeout,hardTimeout);
@@ -126,7 +128,7 @@ void KN_LLDPBalancedMinHop::handlePacketIn(OFP_Packet_In * packet_in_msg){
 
 void KN_LLDPBalancedMinHop::receiveSignal(cComponent *src, simsignal_t id, cObject *obj, cObject *details) {
     LLDPBalancedMinHop::receiveSignal(src,id,obj,details);
-
+    Enter_Method("KN_LLDPBalancedMinHop::receiveSignal %s", cComponent::getSignalName(id));
     //set knagent link
     if(knAgent == NULL && controller != NULL){
         auto appList = controller->getAppList();
@@ -140,22 +142,32 @@ void KN_LLDPBalancedMinHop::receiveSignal(cComponent *src, simsignal_t id, cObje
         }
     }
 
-
-
     //check kandoo events
     if(id == kandooEventSignalId){
-        if(dynamic_cast<KN_Packet *>(obj) != NULL) {
-            KN_Packet *knpck = (KN_Packet *) obj;
+        auto pkt = check_and_cast<Packet *>(obj);
+        auto chunk = pkt->peekAtFront<Chunk>();
+
+        if(dynamicPtrCast<const KN_Packet>(chunk) != nullptr) {
+            auto knpck = pkt->peekAtFront<KN_Packet>();
             if(strcmp(knpck->getKnEntry().trgApp.c_str(),appName.c_str())==0){
                 //this is a received inform
                 if(knpck->getKnEntry().type == 0){
                     //not used by this app
                 } else if(knpck->getKnEntry().type == 1) {
-                    //this is a received request
-                    if (dynamic_cast<OFP_Packet_In *>(knpck->getKnEntry().payload) != NULL) {
-                        OFP_Packet_In *pckin = (OFP_Packet_In *) knpck->getKnEntry().payload;
-                        CommonHeaderFields headerFields = extractCommonHeaderFields(pckin);
+                    //ths is a received request
+                    Packet *pktIn = nullptr;
+                    bool check = false;
+                    if (knpck->getKnEntry().payload) {
+                        pktIn = check_and_cast<Packet *>(knpck->getKnEntry().payload);
+                        auto chunk = pktIn->peekAtFront<Chunk>();
+                        if (dynamicPtrCast<const OFP_Packet_In>(chunk) != nullptr)
+                            check = true;
+                    }
 
+                    if (check) {
+                        CommonHeaderFields headerFields = extractCommonHeaderFields(pktIn);
+
+                        auto pckin = dynamicPtrCast<const OFP_Packet_In>(chunk);
                         //check if we can find a route
 
                         //ignore lldp packets
@@ -184,9 +196,9 @@ void KN_LLDPBalancedMinHop::receiveSignal(cComponent *src, simsignal_t id, cObje
                                 entry2.srcSwitch = "";
                                 entry2.type=2;
                                 entry2.srcController = knpck->getKnEntry().trgController;
-                                entry2.payload = createDropPacketFromPacketIn(pckin);
+                                entry2.payload = createDropPacketFromPacketIn(pktIn);
 
-                                knAgent->sendReply(knpck,entry2);
+                                knAgent->sendReply(pkt,entry2);
                             } else {
                                 //respond with flood packet
                                 KandooEntry entry = KandooEntry();
@@ -197,9 +209,9 @@ void KN_LLDPBalancedMinHop::receiveSignal(cComponent *src, simsignal_t id, cObje
                                 entry.srcSwitch = "";
                                 entry.type=2;
                                 entry.srcController = knpck->getKnEntry().trgController;
-                                entry.payload = createFloodPacketFromPacketIn(pckin);
+                                entry.payload = createFloodPacketFromPacketIn(pktIn);
 
-                                knAgent->sendReply(knpck,entry);
+                                knAgent->sendReply(pkt,entry);
                             }
                         } else {
                             //send packet to next hop
@@ -216,9 +228,9 @@ void KN_LLDPBalancedMinHop::receiveSignal(cComponent *src, simsignal_t id, cObje
                             entry.srcSwitch = "";
                             entry.type=2;
                             entry.srcController = knpck->getKnEntry().trgController;
-                            entry.payload = createPacketOutFromPacketIn(pckin,seg.outport);
+                            entry.payload = createPacketOutFromPacketIn(pktIn,seg.outport);
 
-                            knAgent->sendReply(knpck,entry);
+                            knAgent->sendReply(pkt,entry);
 
                             //set flow mods for all switches under my controller's command
                             oxm_basic_match match = oxm_basic_match();
@@ -240,7 +252,7 @@ void KN_LLDPBalancedMinHop::receiveSignal(cComponent *src, simsignal_t id, cObje
                             entry.srcController = knpck->getKnEntry().trgController;
                             entry.payload = createFlowMod(OFPFC_ADD, match, seg.outport,idleTimeout,hardTimeout);
 
-                            knAgent->sendReply(knpck,entry);
+                            knAgent->sendReply(pkt, entry);
                             computedRoute += seg.chassisId + ":" + std::to_string(seg.outport) + " -> ";
 
                             //iterate the rest of the route and set flow mods for switches under my control
@@ -279,12 +291,21 @@ void KN_LLDPBalancedMinHop::receiveSignal(cComponent *src, simsignal_t id, cObje
 
                 } else if(knpck->getKnEntry().type == 2) {
                     //this is a received reply
-                    if(dynamic_cast<OFP_Packet_Out *>(knpck->getKnEntry().payload) != NULL){
-                        OFP_Packet_Out *pckout = (OFP_Packet_Out *) knpck->getKnEntry().payload;
-                        controller->sendPacketOut(pckout->dup(),controller->findSocketForChassisId(knpck->getKnEntry().trgSwitch));
-                    } else if (dynamic_cast<OFP_Flow_Mod *>(knpck->getKnEntry().payload) != NULL){
-                        OFP_Flow_Mod *pckout = (OFP_Flow_Mod *) knpck->getKnEntry().payload;
-                        controller->sendPacketOut(pckout->dup(),controller->findSocketForChassisId(knpck->getKnEntry().trgSwitch));
+                    Packet *pktOut = nullptr;
+                    bool checkOut = false;
+                    bool checkFlow = false;
+                    if (knpck->getKnEntry().payload) {
+                        pktOut = check_and_cast<Packet *>(knpck->getKnEntry().payload);
+                        auto chunk = pktOut->peekAtFront<Chunk>();
+                        if (dynamicPtrCast<const OFP_Packet_Out>(chunk) != nullptr)
+                            checkOut = true;
+                        if (dynamicPtrCast<const OFP_Flow_Mod>(chunk) != nullptr)
+                            checkFlow = true;
+                    }
+                    if(checkOut){
+                        controller->sendPacketOut(pktOut->dup(),controller->findSocketForChassisId(knpck->getKnEntry().trgSwitch));
+                    } else if (checkFlow){
+                        controller->sendPacketOut(pktOut->dup(),controller->findSocketForChassisId(knpck->getKnEntry().trgSwitch));
                     }
                 }
             }

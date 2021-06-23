@@ -3,8 +3,8 @@
 package scenarios.networks;
 
 import inet.common.misc.ThruputMeteringChannel;
-import inet.networklayer.configurator.ipv4.IPv4NetworkConfigurator;
-import inet.node.ethernet.EtherSwitch;
+import inet.networklayer.configurator.ipv4.Ipv4NetworkConfigurator;
+import inet.node.ethernet.EthernetSwitch;
 import inet.node.inet.StandardHost;
 import openflow.hyperflow.Hyper_Flow_Synchronizer;
 import openflow.openflow.controller.Open_Flow_Controller;
@@ -60,7 +60,7 @@ network Scenario_TestCase
             @display("p=650,490");
         }
 
-        configurator: IPv4NetworkConfigurator {
+        configurator: Ipv4NetworkConfigurator {
             parameters:
                 @display("p=61,175");
         }
@@ -93,7 +93,7 @@ network Scenario_TestCase
             @display("p=497,457");
         }
 
-        etherSwitch: EtherSwitch {
+        etherSwitch: EthernetSwitch {
             @display("p=366,141");
         }
 

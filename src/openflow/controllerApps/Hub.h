@@ -14,7 +14,7 @@ public:
 
 protected:
     void receiveSignal(cComponent *src, simsignal_t id, cObject *obj, cObject *details) override;
-    void initialize();
+    void initialize(int stage) override;
 };
 
 

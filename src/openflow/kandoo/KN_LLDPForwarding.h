@@ -18,8 +18,8 @@ public:
 
 protected:
     void receiveSignal(cComponent *src, simsignal_t id, cObject *obj, cObject *details) override;
-    void initialize();
-    virtual void handlePacketIn(OFP_Packet_In * packet_in_msg);
+    void initialize(int stage) override;
+    virtual void handlePacketIn(Packet * packet_in_msg) override;
 
     KandooAgent * knAgent;
     simsignal_t kandooEventSignalId;

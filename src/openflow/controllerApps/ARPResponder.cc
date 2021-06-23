@@ -1,6 +1,9 @@
 #include "openflow/controllerApps/ARPResponder.h"
+#include "inet/linklayer/ethernet/common/EthernetMacHeader_m.h"
+#include "inet/linklayer/ethernet/common/Ethernet.h"
 #include <algorithm>
-
+#include "inet/linklayer/common/FcsMode_m.h"
+#include "inet/common/ProtocolTag_m.h"
 
 #define MSGKIND_ARPRESPONDERBOOTED 801
 
@@ -14,20 +17,22 @@ ARPResponder::~ARPResponder(){
 
 }
 
-void ARPResponder::initialize(){
-    AbstractControllerApp::initialize();
+void ARPResponder::initialize(int stage){
+    AbstractControllerApp::initialize(stage);
     //stats
-    floodedArp = 0l;
-    answeredArp = 0l;
+    if (stage == INITSTAGE_LOCAL) {
+        floodedArp = 0l;
+        answeredArp = 0l;
+    }
 }
 
 
-void ARPResponder::handleMessage(cMessage *msg){
+void ARPResponder::handleMessageWhenUp(cMessage *msg){
     delete msg;
 }
 
 
-bool ARPResponder::addEntry(std::string srcIp, MACAddress srcMac){
+bool ARPResponder::addEntry(std::string srcIp, MacAddress srcMac){
     if(macToIp.count(srcMac) <= 0){
         //add him to our table
         macToIp[srcMac] = srcIp;
@@ -38,9 +43,14 @@ bool ARPResponder::addEntry(std::string srcIp, MACAddress srcMac){
 }
 
 
-void ARPResponder::handlePacketIn(OFP_Packet_In * packet_in_msg){
+//void ARPResponder::handlePacketIn(OFP_Packet_In * packet_in_msg){
+void ARPResponder::handlePacketIn(Packet *pktIn){
 
-    CommonHeaderFields headerFields = extractCommonHeaderFields(packet_in_msg);
+
+
+    CommonHeaderFields headerFields = extractCommonHeaderFields(pktIn);
+
+    //auto packet_in_msg = pktIn->removeAtFront<OFP_Packet_In>();
 
     //check if it is an arp packet
     if(headerFields.eth_type == ETHERTYPE_ARP){
@@ -55,28 +65,33 @@ void ARPResponder::handlePacketIn(OFP_Packet_In * packet_in_msg){
                 if(ipToMac.count(headerFields.arp_dst_adr.str()) >0){
 
                     //drop the orginal packet
-                    dropPacket(packet_in_msg);
+                    dropPacket(pktIn);
 
                     //encap the arp reply
-                    OFP_Packet_Out *packetOut = new OFP_Packet_Out("packetOut");
+                    auto packetOut = makeShared<OFP_Packet_Out>();
+                    auto pktOut = createArpReply(headerFields.arp_dst_adr,headerFields.arp_src_adr,ipToMac[headerFields.arp_dst_adr.str()],headerFields.src_mac);
+
+                    //OFP_Packet_Out *packetOut = new OFP_Packet_Out("packetOut");
                     packetOut->getHeaderForUpdate().version = OFP_VERSION;
                     packetOut->getHeaderForUpdate().type = OFPT_PACKET_OUT;
                     packetOut->setBuffer_id(OFP_NO_BUFFER);
-                    packetOut->setByteLength(24);
-                    packetOut->encapsulate(createArpReply(headerFields.arp_dst_adr,headerFields.arp_src_adr,ipToMac[headerFields.arp_dst_adr.str()],headerFields.src_mac));
+                    packetOut->setChunkLength(B(24));
+                    //packetOut->encapsulate(createArpReply(headerFields.arp_dst_adr,headerFields.arp_src_adr,ipToMac[headerFields.arp_dst_adr.str()],headerFields.src_mac));
                     packetOut->setIn_port(-1);
                     ofp_action_output *action_output = new ofp_action_output();
+                    action_output->creationModule = dynamic_cast<cModule *>(this)->getClassAndFullName();
                     action_output->port = headerFields.inport;
                     packetOut->setActionsArraySize(1);
                     packetOut->setActions(0, *action_output);
 
                     //send the packet
                     answeredArp++;
-                    controller->sendPacketOut(packetOut,headerFields.swInfo->getSocket());
+                    pktOut->insertAtFront(packetOut);
+                    controller->sendPacketOut(pktOut,headerFields.swInfo->getSocket());
                 } else {
                     //we need to flood the packet
                     floodedArp++;
-                    floodPacket(packet_in_msg);
+                    floodPacket(pktIn);
                 }
             }
 
@@ -84,47 +99,60 @@ void ARPResponder::handlePacketIn(OFP_Packet_In * packet_in_msg){
 
 }
 
-
 void ARPResponder::receiveSignal(cComponent *src, simsignal_t id, cObject *obj, cObject *details) {
     AbstractControllerApp::receiveSignal(src,id,obj,details);
-
+    Enter_Method("ARPResponder::receiveSignal %s", cComponent::getSignalName(id));
     if(id == PacketInSignalId){
         EV << "ARPResponder::PacketIn" << '\n';
-        if (dynamic_cast<OFP_Packet_In *>(obj) != NULL) {
-            OFP_Packet_In *packet_in_msg = (OFP_Packet_In *) obj;
-            handlePacketIn(packet_in_msg);
+        auto pkt = dynamic_cast<Packet *>(obj);
+        if (pkt != nullptr) {
+            auto chunk = pkt->peekAtFront<Chunk>();
+            auto packet_in_msg = dynamicPtrCast<const OFP_Packet_In>(chunk);
+            if (packet_in_msg != nullptr)
+                handlePacketIn(pkt);
         }
     }
 }
 
-EtherFrame * ARPResponder::createArpReply(IPv4Address srcIp, IPv4Address dstIp, MACAddress srcMac,MACAddress dstMac){
-    ARPPacket *arpReply = new ARPPacket("controllerArpReply");
+Packet * ARPResponder::createArpReply(Ipv4Address srcIp, Ipv4Address dstIp, MacAddress srcMac, MacAddress dstMac){
+    auto arpReply = makeShared<ArpPacket>();
+    auto pktArp = new Packet("controllerArpReply");
     arpReply->setOpcode(ARP_REPLY);
-    arpReply->setName("arpReply");
-    arpReply->setSrcIPAddress(srcIp);
-    arpReply->setSrcMACAddress(srcMac);
-    arpReply->setDestIPAddress(dstIp);
-    arpReply->setDestMACAddress(dstMac);
-    arpReply->setByteLength(28);
-    delete arpReply->removeControlInfo();
+    //arpReply->setName("arpReply");
+    arpReply->setSrcIpAddress(srcIp);
+    arpReply->setSrcMacAddress(srcMac);
+    arpReply->setDestIpAddress(dstIp);
+    arpReply->setDestMacAddress(dstMac);
+    arpReply->setChunkLength(B(28));
 
+    pktArp->insertAtFront(arpReply);
 
+    auto eth2Frame = makeShared<EthernetMacHeader>();
 
-    EtherFrame *frame = NULL;
-    EthernetIIFrame *eth2Frame = new EthernetIIFrame(arpReply->getName());
-    eth2Frame->setSrc(arpReply->getSrcMACAddress());  // if blank, will be filled in by MAC
-    eth2Frame->setDest(arpReply->getDestMACAddress());
-    eth2Frame->setEtherType(ETHERTYPE_ARP);
-    eth2Frame->setByteLength(ETHER_MAC_FRAME_BYTES);
+    // EthernetIIFrame *eth2Frame = new EthernetIIFrame(arpReply->getName());
+    eth2Frame->setSrc(arpReply->getSrcMacAddress());  // if blank, will be filled in by MAC
+    eth2Frame->setDest(arpReply->getDestMacAddress());
+    eth2Frame->setTypeOrLength(ETHERTYPE_ARP);
 
-    frame = eth2Frame;
-    frame->encapsulate(arpReply);
-    if (frame->getByteLength() < MIN_ETHERNET_FRAME_BYTES)
-        frame->setByteLength(MIN_ETHERNET_FRAME_BYTES);  // "padding"
+    pktArp->insertAtFront(eth2Frame);
+    const auto& ethernetFcs = makeShared<EthernetFcs>();
+    pktArp->addTagIfAbsent<PacketProtocolTag>()->setProtocol(&Protocol::ethernetMac);
 
-    frame->addByteLength(PREAMBLE_BYTES+SFD_BYTES);
+    //frame = eth2Frame;
+    //frame->encapsulate(arpReply);
+    ethernetFcs->setFcsMode(FCS_DECLARED_CORRECT);
+    ethernetFcs->setFcs(0xC00DC00DL);
 
-    return frame;
+    B paddingLength = MIN_ETHERNET_FRAME_BYTES - ETHER_FCS_BYTES - B(pktArp->getByteLength());
+    if (paddingLength > B(0)) {
+        const auto& ethPadding = makeShared<EthernetPadding>();
+        ethPadding->setChunkLength(paddingLength);
+        pktArp->insertAtBack(ethPadding);
+    }
+
+    pktArp->insertAtBack(ethernetFcs);
+
+    return pktArp;
 }
 
 

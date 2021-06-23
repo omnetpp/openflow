@@ -6,7 +6,7 @@
 #include "openflow/controllerApps/LLDPAgent.h"
 #include "openflow/controllerApps/AbstractControllerApp.h"
 #include "openflow/messages/LLDP_m.h"
-#include "inet/transportlayer/contract/tcp/TCPSocket.h"
+#include "inet/transportlayer/contract/tcp/TcpSocket.h"
 #include "openflow/openflow/controller/Switch_Info.h"
 #include "openflow/controllerApps/LLDPMibGraph.h"
 #include "openflow/messages/OFP_Features_Reply_m.h"
@@ -24,9 +24,9 @@ public:
     LLDPMibGraph * getMibGraph();
 
 protected:
-    void receiveSignal(cComponent *src, simsignal_t id, cObject *obj, cObject *details) override;
-    void initialize();
-    void handlePacketIn(OFP_Packet_In * packet_in_msg);
+    virtual void receiveSignal(cComponent *src, simsignal_t id, cObject *obj, cObject *details) override;
+    virtual void initialize(int stage) override;
+    virtual void handlePacketIn(Packet *) override;
     KandooAgent * kandooAgent;
     simsignal_t kandooEventSignalId;
     std::string appName;

@@ -1,23 +1,9 @@
 
 import openflow.messages.Open_Flow_Message;
-cplusplus {{
-    #include "openflow/openflow/protocol/openflow.h"
- //   #include "openflow/messages/Open_Flow_Message_m.h"
-    #include "inet/linklayer/common/MACAddress.h"
-}};
-
-class MACAddress
-{
-    @existingClass;
-    @opaque;
-//    @toString(.str());
-}
-
-//class MACAddress extends void;
-//packet Open_Flow_Message;
+import inet.linklayer.common.MacAddress;
 
 // response  to an OFP_Features_Request message
-packet OFP_Features_Reply extends Open_Flow_Message
+class OFP_Features_Reply extends Open_Flow_Message
 {
   	string datapath_id;		// Datapath unique ID. The lower 48-bits are for a MAC address,
     					   	// while the upper 16-bits are implementer-defined.

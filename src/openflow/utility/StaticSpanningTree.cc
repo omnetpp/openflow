@@ -3,7 +3,9 @@ Define_Module(StaticSpanningTree);
 
 
 void StaticSpanningTree::initialize(int stage) {
-    if (stage == INITSTAGE_LINK_LAYER_2) {
+
+    OperationalBase::initialize(stage);
+    if (stage == INITSTAGE_NETWORK_LAYER) {
         const char *NodeType = par("NodeType");
         int startNode = par("startNode");
 
@@ -95,6 +97,6 @@ void StaticSpanningTree::initialize(int stage) {
     }
 }
 
-void StaticSpanningTree::handleMessage(cMessage *msg) {
+void StaticSpanningTree::handleMessageWhenUp(cMessage *msg) {
     error("this module doesn't handle messages, it runs only in initialize()");
 }

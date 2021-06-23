@@ -5,7 +5,7 @@
 #include <omnetpp.h>
 #include "openflow/controllerApps/AbstractControllerApp.h"
 #include "openflow/messages/LLDP_m.h"
-#include "inet/transportlayer/contract/tcp/TCPSocket.h"
+#include "inet/transportlayer/contract/tcp/TcpSocket.h"
 #include "openflow/openflow/controller/Switch_Info.h"
 #include "openflow/controllerApps/LLDPMibGraph.h"
 #include "openflow/messages/OFP_Features_Reply_m.h"
@@ -21,11 +21,11 @@ public:
     LLDPMibGraph * getMibGraph();
 
 protected:
-    void receiveSignal(cComponent *src, simsignal_t id, cObject *obj, cObject *details) override;
-    void initialize();
-    virtual void handleMessage(cMessage *msg);
+    virtual void receiveSignal(cComponent *src, simsignal_t id, cObject *obj, cObject *details) override;
+    virtual void initialize(int stage) override;
+    virtual void handleMessageWhenUp(cMessage *msg) override;
     void triggerFlowMod(Switch_Info * swInfo);
-    virtual void handlePacketIn(OFP_Packet_In * packet_in_msg);
+    virtual void handlePacketIn(Packet * packet_in_msg);
     void sendLLDP();
     double pollInterval;
     double timeOut;

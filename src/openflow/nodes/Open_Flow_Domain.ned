@@ -3,7 +3,7 @@
 package openflow.nodes;
 
 import inet.common.misc.ThruputMeteringChannel;
-import inet.node.ethernet.EtherSwitch;
+import inet.node.ethernet.EthernetSwitch;
 import inet.node.inet.StandardHost;
 import openflow.openflow.switch.Open_Flow_Switch;
 
@@ -35,7 +35,7 @@ module Open_Flow_Domain
                 gateDataPlane[sizeof(gateDPlane)+numClients];
         }
 
-        etherSwitch: EtherSwitch {
+        etherSwitch: EthernetSwitch {
             @display("p=240,186");
             gates:
                 ethg[sizeof(gateCPlane)];

@@ -4,7 +4,7 @@
 #define HF_REFIRE_WRAPPER_H_
 
 #include <omnetpp.h>
-#include "inet/linklayer/common/MACAddress.h"
+#include "inet/linklayer/common/MacAddress.h"
 #include "openflow/hyperflow/HyperFlowStructs.h"
 
 using namespace std;

@@ -3,7 +3,7 @@
 #define SWITCH_INFO_H_
 
 #include "openflow/openflow/protocol/openflow.h"
-#include "inet/transportlayer/contract/tcp/TCPSocket.h"
+#include "inet/transportlayer/contract/tcp/TcpSocket.h"
 
 using namespace __gnu_cxx;
 
@@ -19,15 +19,23 @@ class Switch_Info {
         void setMacAddress(std::string macAddress);
         int getNumOfPorts() const;
         void setNumOfPorts(int numOfPorts);
-        TCPSocket* getSocket() const;
-        void setSocket(TCPSocket* socket);
+        TcpSocket* getSocket() const;
+        void setSocket(TcpSocket* socket);
+
+        void setSwitchPortsIndexId(const int &, const int &);
+
+
+        int getIndexPort(const int&);
+        int getIdPort(const int&);
 
 
     protected:
+        std::vector<int> idPort;
+
         int connID;
         int numOfPorts;
         std::string macAddress;
-        TCPSocket *socket;
+        TcpSocket *socket;
         int version;
 
 };

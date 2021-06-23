@@ -14,7 +14,7 @@ struct DataChannelEntry{
     std::string srcController;
     std::string trgSwitch;
     int eventId;
-    cObject * payload;
+    omnetpp::cObject * payload;
 };
 
 

@@ -3,19 +3,26 @@
 #include <iostream>
 
 #include "openflow/hostApps/LocalityPingAppRandom.h"
+#include "inet/networklayer/common/L3AddressResolver.h"
+#include "inet/networklayer/common/L3AddressTag_m.h"
+#include "inet/networklayer/common/NetworkInterface.h"
+#include "inet/networklayer/contract/IInterfaceTable.h"
+#include "inet/networklayer/contract/IL3AddressType.h"
+#include "inet/networklayer/contract/L3Socket.h"
+#include "inet/networklayer/contract/ipv4/Ipv4Socket.h"
+#include "inet/networklayer/contract/ipv6/Ipv6Socket.h"
 
 #include "inet/networklayer/common/L3AddressResolver.h"
-#include "inet/applications/pingapp/PingPayload_m.h"
-#include "inet/networklayer/contract/ipv4/IPv4ControlInfo.h"
-#include "inet/networklayer/contract/ipv6/IPv6ControlInfo.h"
 
 using namespace std;
 using std::cout;
+using namespace inet;
 
 Define_Module(LocalityPingAppRandom);
 
 
 void LocalityPingAppRandom::initialize(int stage){
+    PingApp::initialize(stage);
     if(stage == INITSTAGE_LOCAL){
         //set params
         localityRelation = par("localityRelation");
@@ -51,58 +58,41 @@ void LocalityPingAppRandom::initialize(int stage){
         ifs.close();
 
     }
-    PingApp::initialize(stage);
 }
 
-void LocalityPingAppRandom::handleMessage(cMessage *msg){
 
-    if (!isNodeUp()){
-            if (msg->isSelfMessage())
-                throw cRuntimeError("Application is not running");
-            delete msg;
-            return;
-        }
-        if (msg == timer){
-            //determine local oder global
-            if(dblrand() <= localityRelation){
-                //determine random local target
-                std::vector<std::string> tempVec = groupToNodes[localId];
-                connectAddress = (tempVec[intrand(groupToNodes[localId].size())]);
 
-            } else {
-                //determine random global target
-
-                //determine group
-                int tempRand = intrand(groupToNodes.size());
-                while(tempRand == atoi(localId.c_str())){
-                    tempRand = intrand(groupToNodes.size());
-                }
-                //determine host
-                std::vector<std::string> tempVec = groupToNodes[std::to_string(tempRand)];
-                connectAddress = (tempVec[intrand(groupToNodes[std::to_string(tempRand)].size())]);
+void LocalityPingAppRandom::handleSelfMessage(omnetpp::cMessage *msg)
+{
+    if (msg == timer){
+        //determine local oder global
+        if(dblrand() <= localityRelation){
+            //determine random local target
+            std::vector<std::string> tempVec = groupToNodes[localId];
+            connectAddress = (tempVec[intrand(groupToNodes[localId].size())]);
+        } else {
+            //determine random global target
+            //determine group
+            int tempRand = intrand(groupToNodes.size());
+            while(tempRand == atoi(localId.c_str())){
+                tempRand = intrand(groupToNodes.size());
             }
-
-
-            destAddr = L3AddressResolver().resolve(connectAddress.c_str());
-            ASSERT(!destAddr.isUnspecified());
-            srcAddr = L3AddressResolver().resolve(par("srcAddr"));
-            EV << "Starting up: dest=" << destAddr << "  src=" << srcAddr << "\n";
-
-            sendPing();
-            if (isEnabled())
-                scheduleNextPingRequest(simTime(), true);
+            //determine host
+            std::vector<std::string> tempVec = groupToNodes[std::to_string(tempRand)];
+            connectAddress = (tempVec[intrand(groupToNodes[std::to_string(tempRand)].size())]);
         }
-        else
-            processPingResponse(check_and_cast<PingPayload *>(msg));
 
-        if (hasGUI()){
-            char buf[40];
-            sprintf(buf, "sent: %ld pks\nrcvd: %ld pks", sentCount, numPongs);
-            getDisplayString().setTagArg("t", 0, buf);
-        }
+        destAddr = L3AddressResolver().resolve(connectAddress.c_str());
+        ASSERT(!destAddr.isUnspecified());
+        srcAddr = L3AddressResolver().resolve(par("srcAddr"));
+        EV << "Starting up: dest=" << destAddr << "  src=" << srcAddr << "\n";
+        sendPingRequest();
+        if (isEnabled())
+            scheduleNextPingRequest(simTime(), true);
+    }
 }
-
 
 bool LocalityPingAppRandom::isEnabled(){
     return (count == -1 || sentCount < count);
 }
+

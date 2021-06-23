@@ -3,10 +3,10 @@
 package openflow.hostApps;
 
 
-import inet.applications.contract.ITCPApp;
+import inet.applications.contract.IApp;
 
 
-simple TCPTrafficSinkApp like ITCPApp
+simple TCPTrafficSinkApp like IApp
 {
     parameters:
         @display("i=block/app");
@@ -14,7 +14,7 @@ simple TCPTrafficSinkApp like ITCPApp
         int localPort = default(-1);  // local port
 
     gates:
-        input tcpIn @labels(TCPCommand/up);
-        output tcpOut @labels(TCPCommand/down);
+        input socketIn @labels(TcpCommand/up);
+        output socketOut @labels(TcpCommand/down);
 }
 

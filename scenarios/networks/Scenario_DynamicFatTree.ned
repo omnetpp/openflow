@@ -3,7 +3,7 @@
 package scenarios.networks;
 
 import inet.common.misc.ThruputMeteringChannel;
-import inet.networklayer.configurator.ipv4.IPv4NetworkConfigurator;
+import inet.networklayer.configurator.ipv4.Ipv4NetworkConfigurator;
 import openflow.nodes.DynamicFatTree;
 import openflow.openflow.controller.Open_Flow_Controller;
 import openflow.utility.OpenFlowGraphAnalyzer;
@@ -33,7 +33,7 @@ network Scenario_DynamicFatTree
         }
 
 
-        configurator: IPv4NetworkConfigurator {
+        configurator: Ipv4NetworkConfigurator {
             parameters:
                 @display("p=198,190");
         }

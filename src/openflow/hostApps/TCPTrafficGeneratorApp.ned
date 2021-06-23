@@ -3,10 +3,10 @@
 package openflow.hostApps;
 
 
-import inet.applications.contract.ITCPApp;
+import inet.applications.contract.IApp;
 
 
-simple TCPTrafficGeneratorApp like ITCPApp
+simple TCPTrafficGeneratorApp like IApp
 {
     parameters:
         @signal[connectionFinished](type="simtime_t");
@@ -24,7 +24,7 @@ simple TCPTrafficGeneratorApp like ITCPApp
         string pathToFlowSizes = default("");
 
     gates:
-        input tcpIn @labels(TCPCommand/up);
-        output tcpOut @labels(TCPCommand/down);
+        input socketIn @labels(TcpCommand/up);
+        output socketOut @labels(TcpCommand/down);
 }
 

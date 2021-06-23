@@ -18,9 +18,9 @@ using namespace inet;
  */
 class LocalityPingAppRandom : public PingApp {
   protected:
-    virtual void initialize(int stage);
-    virtual void handleMessage(cMessage *msg);
-    virtual bool isEnabled();
+    virtual void initialize(int stage) override;
+    virtual void handleSelfMessage(omnetpp::cMessage *msg) override;
+    virtual bool isEnabled() override;
 
     cTopology topo;
     std::string connectAddress;
