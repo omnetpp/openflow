@@ -102,7 +102,7 @@ void HyperFlowSynchronizer::handleSyncRequest(HF_SyncRequest * msg){
             iterControl--;
         }
     }
-    reply->getControlChannel().insert(reply->getControlChannel().end(), tempControlChannel.begin(), tempControlChannel.end());
+    reply->getControlChannelForUpdate().insert(reply->getControlChannel().end(), tempControlChannel.begin(), tempControlChannel.end());
 
     //copy only the relevant parts of the datachannel
     std::list<DataChannelEntry> tempDataChannel = std::list<DataChannelEntry>();

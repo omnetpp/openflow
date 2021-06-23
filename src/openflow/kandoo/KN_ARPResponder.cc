@@ -67,8 +67,8 @@ void KN_ARPResponder::handlePacketIn(OFP_Packet_In * packet_in_msg){
 
                     //encap the arp reply
                     OFP_Packet_Out *packetOut = new OFP_Packet_Out("packetOut");
-                    packetOut->getHeader().version = OFP_VERSION;
-                    packetOut->getHeader().type = OFPT_PACKET_OUT;
+                    packetOut->getHeaderForUpdate().version = OFP_VERSION;
+                    packetOut->getHeaderForUpdate().type = OFPT_PACKET_OUT;
                     packetOut->setBuffer_id(OFP_NO_BUFFER);
                     packetOut->setByteLength(24);
                     packetOut->encapsulate(createArpReply(headerFields.arp_dst_adr,headerFields.arp_src_adr,ipToMac[headerFields.arp_dst_adr.str()],headerFields.src_mac));
@@ -164,8 +164,8 @@ void KN_ARPResponder::receiveSignal(cComponent *src, simsignal_t id, cObject *ob
 
                                     //encap the arp reply
                                     OFP_Packet_Out *packetOut = new OFP_Packet_Out("packetOut");
-                                    packetOut->getHeader().version = OFP_VERSION;
-                                    packetOut->getHeader().type = OFPT_PACKET_OUT;
+                                    packetOut->getHeaderForUpdate().version = OFP_VERSION;
+                                    packetOut->getHeaderForUpdate().type = OFPT_PACKET_OUT;
                                     packetOut->setBuffer_id(OFP_NO_BUFFER);
                                     packetOut->setByteLength(24);
                                     packetOut->encapsulate(createArpReply(headerFields.arp_dst_adr,headerFields.arp_src_adr,ipToMac[headerFields.arp_dst_adr.str()],headerFields.src_mac));

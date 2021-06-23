@@ -183,8 +183,8 @@ void OF_Switch::connect(const char *addressToConnect){
 
     socket.connect(L3AddressResolver().resolve(connectAddress), connectPort);
     OFP_Hello *msg = new OFP_Hello("Hello");
-    msg->getHeader().version = OFP_VERSION;
-    msg->getHeader().type = OFPT_HELLO;
+    msg->getHeaderForUpdate().version = OFP_VERSION;
+    msg->getHeaderForUpdate().type = OFPT_HELLO;
     msg->setByteLength(8);
     msg->setKind(TCP_C_SEND);
     socket.send(msg);
@@ -208,7 +208,7 @@ void OF_Switch::processQueuedMsg(cMessage *data_msg){
         controlPlanePacket++;
        if (dynamic_cast<Open_Flow_Message *>(data_msg) != NULL) { //msg from controller
             Open_Flow_Message *of_msg = (Open_Flow_Message *)data_msg;
-            ofp_type type = (ofp_type)of_msg->getHeader().type;
+            ofp_type type = (ofp_type)of_msg->getHeaderForUpdate().type;
             switch (type){
                 case OFPT_FEATURES_REQUEST:
                     handleFeaturesRequestMessage(of_msg);
@@ -269,8 +269,8 @@ void OF_Switch::processFrame(EthernetIIFrame *frame){
        if(outport == OFPP_CONTROLLER){
            //send it to the controller
            OFP_Packet_In *packetIn = new OFP_Packet_In("packetIn");
-           packetIn->getHeader().version = OFP_VERSION;
-           packetIn->getHeader().type = OFPT_PACKET_IN;
+           packetIn->getHeaderForUpdate().version = OFP_VERSION;
+           packetIn->getHeaderForUpdate().type = OFPT_PACKET_IN;
            packetIn->setReason(OFPR_ACTION);
            packetIn->setByteLength(32);
            packetIn->encapsulate(frame);
@@ -299,8 +299,8 @@ void OF_Switch::processFrame(EthernetIIFrame *frame){
 
 void OF_Switch::handleFeaturesRequestMessage(Open_Flow_Message *of_msg){
     OFP_Features_Reply *featuresReply = new OFP_Features_Reply("FeaturesReply");
-    featuresReply->getHeader().version = OFP_VERSION;
-    featuresReply->getHeader().type = OFPT_FEATURES_REPLY;
+    featuresReply->getHeaderForUpdate().version = OFP_VERSION;
+    featuresReply->getHeaderForUpdate().type = OFPT_FEATURES_REPLY;
 
     IInterfaceTable *inet_ift = getModuleFromPar<IInterfaceTable>(par("interfaceTableModule"), this);
 
@@ -333,8 +333,8 @@ void OF_Switch::handleFlowModMessage(Open_Flow_Message *of_msg){
 
 void OF_Switch::handleMissMatchedPacket(EthernetIIFrame *frame){
     OFP_Packet_In *packetIn = new OFP_Packet_In("packetIn");
-    packetIn->getHeader().version = OFP_VERSION;
-    packetIn->getHeader().type = OFPT_PACKET_IN;
+    packetIn->getHeaderForUpdate().version = OFP_VERSION;
+    packetIn->getHeaderForUpdate().type = OFPT_PACKET_IN;
     packetIn->setReason(OFPR_NO_MATCH);
 
     packetIn->setByteLength(32);
@@ -388,7 +388,7 @@ void OF_Switch::handlePacketOutMessage(Open_Flow_Message *of_msg){
 
     //execute
     for (unsigned int i = 0; i < actions_size; ++i){
-        executePacketOutAction(&(packet_out_msg->getActions(i)), frame, inPort);
+        executePacketOutAction(&(packet_out_msg->getActionsForUpdate(i)), frame, inPort);
     }
 }
 

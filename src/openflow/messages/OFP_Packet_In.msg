@@ -1,9 +1,9 @@
-
+import openflow.messages.Open_Flow_Message;
 
 cplusplus {{
     #include "openflow/openflow/protocol/openflow.h"
-    #include "openflow/messages/Open_Flow_Message_m.h"
-    #include "inet/linklayer/ethernet/EtherFrame_m.h"
+//    #include "openflow/messages/Open_Flow_Message_m.h"
+   #include "inet/linklayer/ethernet/EtherFrame_m.h"
     
     
     inline std::ostream& operator<<(std::ostream& os, oxm_basic_match match)
@@ -17,11 +17,20 @@ cplusplus {{
 	}
 }};
 
-struct ofp_header;
+class oxm_basic_match
+{
+    @existingClass;
+    @opaque;
+ //   @toString(.str());
+}
+
+
+
+//struct ofp_header;
 //class EthernetIIFrame;
-struct oxm_basic_match;
-struct oxm_tlv;
-packet Open_Flow_Message;
+//struct oxm_basic_match;
+//struct oxm_tlv;
+//packet Open_Flow_Message;
 
 // When packets are received by the data plane and sent to the connected controller,
 // the OFP_PACKET_IN messages are used. If the complete packet needs to be sent to the controller, because it can not be

@@ -77,8 +77,8 @@ void LLDPAgent::sendLLDP(){
 
             //create packet out*/
             OFP_Packet_Out *packetOut = new OFP_Packet_Out("packetOut");
-            packetOut->getHeader().version = OFP_VERSION;
-            packetOut->getHeader().type = OFPT_PACKET_OUT;
+            packetOut->getHeaderForUpdate().version = OFP_VERSION;
+            packetOut->getHeaderForUpdate().type = OFPT_PACKET_OUT;
             packetOut->setBuffer_id(OFP_NO_BUFFER);
             packetOut->setByteLength(24);
             packetOut->encapsulate(frame);

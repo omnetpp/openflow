@@ -134,7 +134,7 @@ void OF_Controller::calcAvgQueueSize(int size){
 void OF_Controller::processQueuedMsg(cMessage *data_msg){
     if (dynamic_cast<Open_Flow_Message *>(data_msg) != NULL) {
         Open_Flow_Message *of_msg = (Open_Flow_Message *)data_msg;
-        ofp_type type = (ofp_type)of_msg->getHeader().type;
+        ofp_type type = (ofp_type)of_msg->getHeaderForUpdate().type;
 
         switch (type) {
             case OFPT_FEATURES_REPLY:
@@ -158,8 +158,8 @@ void OF_Controller::processQueuedMsg(cMessage *data_msg){
 
 void OF_Controller::sendHello(Open_Flow_Message *msg){
     OFP_Hello *hello = new OFP_Hello("Hello");
-    hello->getHeader().version = OFP_VERSION;
-    hello->getHeader().type = OFPT_HELLO;
+    hello->getHeaderForUpdate().version = OFP_VERSION;
+    hello->getHeaderForUpdate().type = OFPT_HELLO;
     hello->setByteLength(8);
     hello->setKind(TCP_C_SEND);
 
@@ -170,8 +170,8 @@ void OF_Controller::sendHello(Open_Flow_Message *msg){
 
 void OF_Controller::sendFeatureRequest(cMessage *msg){
     OFP_Features_Request *featuresRequest = new OFP_Features_Request("FeaturesRequest");
-    featuresRequest->getHeader().version = OFP_VERSION;
-    featuresRequest->getHeader().type = OFPT_FEATURES_REQUEST;
+    featuresRequest->getHeaderForUpdate().version = OFP_VERSION;
+    featuresRequest->getHeaderForUpdate().type = OFPT_FEATURES_REQUEST;
     featuresRequest->setByteLength(8);
     featuresRequest->setKind(TCP_C_SEND);
 
@@ -218,7 +218,7 @@ void OF_Controller::registerConnection(Open_Flow_Message *msg){
         swInfo.setConnId(socket->getConnectionId());
         swInfo.setMacAddress("");
         swInfo.setNumOfPorts(-1);
-        swInfo.setVersion(msg->getHeader().version);
+        swInfo.setVersion(msg->getHeaderForUpdate().version);
         switchesList.push_back(swInfo);
     }
 }

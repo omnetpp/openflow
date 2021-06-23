@@ -9,7 +9,7 @@
 #include "openflow/messages/OFP_Features_Reply_m.h"
 #include "openflow/messages/OFP_Packet_In_m.h"
 #include "inet/networklayer/arp/ipv4/ARPPacket_m.h"
-
+#include "inet/linklayer/ethernet/EtherFrame_m.h"
 
 class ARPResponder:public AbstractControllerApp {
 

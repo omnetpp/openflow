@@ -1,12 +1,12 @@
 
-
+import openflow.messages.Open_Flow_Message;
 cplusplus {{
     #include "openflow/openflow/protocol/openflow.h"
-    #include "openflow/messages/Open_Flow_Message_m.h"
+//    #include "openflow/messages/Open_Flow_Message_m.h"
 }};
 
 
-packet Open_Flow_Message;
+//packet Open_Flow_Message;
 
 
 //Upon session establishment, the controller sends an OFP Features Request message

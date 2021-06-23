@@ -125,7 +125,7 @@ void HyperFlowAgent::sendReportIn(){
     //copy switches list
     auto tempList = controller->getSwitchesList();
     for(auto iterSw=tempList->begin();iterSw!=tempList->end();++iterSw){
-        reportIn->getSwitchInfoList().push_front(&(*iterSw));
+        reportIn->getSwitchInfoListForUpdate().push_front(&(*iterSw));
     }
 
     reportIn->setByteLength(1+sizeof(reportIn->getSwitchInfoList()));
