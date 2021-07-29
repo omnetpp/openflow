@@ -1,20 +1,6 @@
 import openflow.messages.Open_Flow_Message;
 
-cplusplus {{
-    #include "openflow/openflow/protocol/openflow.h"
-    inline std::ostream& operator<<(std::ostream& os, ofp_action_output action)
-    {
-		os << "Port (hex): " << std::hex << action.port << endl;
-		return os;
-	}
-}};
 
-class ofp_action_output
-{
-    @existingClass;
-    @opaque;
-//    @toString(.str());
-}
 
 //When the controller decides to send a packet out through the data plane, it uses the
 //OFP PACKET OUT message.

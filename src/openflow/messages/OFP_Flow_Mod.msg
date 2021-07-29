@@ -1,24 +1,6 @@
 
 import openflow.messages.Open_Flow_Message;
 
-cplusplus {{
-    #include "openflow/openflow/protocol/openflow.h"
-}};
-
-class oxm_basic_match
-{
-    @existingClass;
-    @opaque;
-//    @toString(.str());
-}
-  
-class ofp_action_output
-{
-    @existingClass;
-    @opaque;
-//    @toString(.str());
-}
-  
 // Modifications to a flow table by the controller.
 class OFP_Flow_Mod extends Open_Flow_Message
 {
