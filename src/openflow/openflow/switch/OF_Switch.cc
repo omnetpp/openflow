@@ -1,3 +1,12 @@
+#include "inet/linklayer/ethernet/base/EthernetMacBase.h"
+#include "inet/networklayer/arp/ipv4/ArpPacket_m.h"
+#include "inet/networklayer/common/L3AddressResolver.h"
+#include "inet/linklayer/common/InterfaceTag_m.h"
+#include "inet/common/packet/dissector/PacketDissector.h"
+#include "inet/networklayer/ipv4/IcmpHeader.h"
+#include "inet/common/Protocol.h"
+#include "inet/common/ProtocolTag_m.h"
+
 #include "openflow/openflow/switch/OF_Switch.h"
 #include "openflow/openflow/protocol/openflow.h"
 
@@ -9,23 +18,7 @@
 #include "openflow/messages/OFP_Packet_In_m.h"
 #include "openflow/messages/OFP_Packet_Out_m.h"
 #include "openflow/messages/OFP_Flow_Mod_m.h"
-
-#include "inet/linklayer/ethernet/common/Ethernet.h"
-#include "inet/linklayer/ethernet/common/EthernetMacHeader_m.h"
-#include "inet/linklayer/common/MacAddress.h"
-#include "inet/networklayer/arp/ipv4/ArpPacket_m.h"
-
-#include "inet/networklayer/common/L3AddressResolver.h"
-
-#include "inet/common/ModuleAccess.h"
-#include "inet/networklayer/common/InterfaceTable.h"
-#include "inet/linklayer/ethernet/base/EthernetMacBase.h"
-#include "inet/linklayer/common/InterfaceTag_m.h"
 #include <vector>
-#include "inet/common/packet/dissector/PacketDissector.h"
-#include "inet/networklayer/ipv4/IcmpHeader.h"
-#include "inet/common/Protocol.h"
-#include "inet/common/ProtocolTag_m.h"
 
 //#include "inet/applications/pingapp/PingPayload_m.h"
 //#include "inet/networklayer/ipv4/ICMPMessage.h"

@@ -16,6 +16,7 @@ protected:
 
         virtual void initialize(int stage) override;
         virtual void finish() override;
+        virtual void finish(cComponent *component, simsignal_t signalID) override {cListener::finish(component, signalID);}
         virtual void handleMessageWhenUp(cMessage *msg) override;
 
         virtual void receiveSignal(cComponent *source, simsignal_t signalID, unsigned long l, cObject *details) override;
