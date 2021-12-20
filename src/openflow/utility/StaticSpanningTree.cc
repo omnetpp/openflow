@@ -14,6 +14,8 @@ void StaticSpanningTree::initialize(int stage) {
        topo_spanntree.extractByNedTypeName(nodeTypes);
        EV << "cTopology found " << topo_spanntree.getNumNodes() << "\n";
 
+       if (topo_spanntree.getNumNodes() == 0)
+           throw cRuntimeError("Impossible to compute the Spanning tree, 0 nodes found");
 
         nodeInfo.resize(topo_spanntree.getNumNodes());
         for (int i = 0; i < topo_spanntree.getNumNodes(); i++) {
