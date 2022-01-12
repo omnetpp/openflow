@@ -12,6 +12,7 @@
  */
 class PingAppRandom : public inet::PingApp {
   protected:
+    virtual bool isEnabled() override;
     virtual void initialize(int stage) override;
     virtual void handleSelfMessage(omnetpp::cMessage *msg) override;
 
