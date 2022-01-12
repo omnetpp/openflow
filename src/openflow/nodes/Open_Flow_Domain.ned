@@ -31,14 +31,14 @@ module Open_Flow_Domain
     submodules:
         open_flow_switch: Open_Flow_Switch {
             @display("p=120,186");
-            gates:
-                gateDataPlane[sizeof(gateDPlane)+numClients];
+           // gates:
+           //     gateDataPlane[sizeof(this.gateDPlane)+numClients];
         }
 
         etherSwitch: EthernetSwitch {
             @display("p=240,186");
-            gates:
-                ethg[sizeof(gateCPlane)];
+       //     gates:
+       //         ethg[sizeof(this.gateCPlane)];
         }
 
         client[numClients]: StandardHost {
@@ -46,15 +46,15 @@ module Open_Flow_Domain
         }
     connections allowunconnected:
         for i=0..sizeof(gateDPlane)-1 {
-            gateDPlane[i] <--> open_flow_switch.gateDataPlane[i];
+            gateDPlane[i] <--> open_flow_switch.gateDataPlane++;
         }
 
         for i=0..numClients-1 {
-            client[i].ethg++ <--> ethernetline <--> open_flow_switch.gateDataPlane[sizeof(gateDPlane)+i];
+            client[i].ethg++ <--> ethernetline <--> open_flow_switch.gateDataPlane++;
         }
 
         for i=0..sizeof(gateCPlane)-1 {
-            etherSwitch.ethg[i] <--> gateCPlane[i];
+            etherSwitch.ethg++ <--> gateCPlane[i];
         }
 
         etherSwitch.ethg++ <--> ethernetline <--> open_flow_switch.gateControlPlane++;

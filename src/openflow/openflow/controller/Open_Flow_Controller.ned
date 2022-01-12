@@ -31,8 +31,9 @@ module Open_Flow_Controller
         int numExtInterfaces = default(0);
         double serviceTime @unit("s") = default(0s);
 
-        *.forwarding = forwarding;
-        *.multicastForwarding = multicastForwarding;   // for IPv4, IPv6, Generic
+        *.forwarding = this.forwarding;
+        *.multicastForwarding = this.multicastForwarding;   // for IPv4, IPv6, Generic
+        OF_Controller.serviceTime = this.serviceTime;
         //*.routingTableModule = default(absPath(".routingTable"));
         *.interfaceTableModule = default(absPath(".interfaceTable"));
 
@@ -86,7 +87,7 @@ module Open_Flow_Controller
         }
         OF_Controller: OF_Controller {
             @display("p=424,48");
-            serviceTime = serviceTime;
+            //serviceTime = this.serviceTime;
         }
 
     connections allowunconnected:

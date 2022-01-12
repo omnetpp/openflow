@@ -19,9 +19,10 @@ module Open_Flow_Switch
         @display("i=device/switch;i2=openflow/OpenFlow-Logo-small");
         bool sendCompletePacket = default(false);
         double serviceTime @unit("s") = default(0s);
-        bool csmacdSupport = default(true);  // by default use CSMA/CD
-        string macType = default(csmacdSupport ? "EtherMAC" : "EtherMACFullDuplex"); // ~EtherMAC or ~EtherMACFullDuplex
-
+        
+        bool duplexMode = default(true);      // selects full-duplex (true) or half-duplex (false) operation
+        bool csmacdSupport = default(!duplexMode);  // by default CSMA/CD is turned off, so only point-to-point duplex links are supported.
+        
         string networkLayerType = default("Ipv4NetworkLayer");
         string routingTableType = default("Ipv4RoutingTable");
 
@@ -32,13 +33,14 @@ module Open_Flow_Switch
         bool multicastForwarding = default(false);
         string routingFile = default("");
 
-        *.forwarding = forwarding;
-        *.multicastForwarding = multicastForwarding;   // for IPv4, IPv6, Generic
+        *.forwarding = this.forwarding;
+        *.multicastForwarding = this.multicastForwarding;   // for IPv4, IPv6, Generic
         *.interfaceTableModule = default(absPath(".interfaceTable"));
-        etherMAC[*].encapType = "EtherEncapDummy";
-        etherMAC[*].csmacdSupport = csmacdSupport;
-        etherMAC[*].macType = macType;
-        *.proxyARP = false;
+        etherMAC[*].encap.typename = "OmittedEthernetEncapsulation"; //etherMAC[*].encapType = "EtherEncapDummy";
+        etherMAC[*].csmacdSupport = this.csmacdSupport;
+        etherMAC[*].duplexMode = this.duplexMode;
+        OF_Switch.sendCompletePacket = this.sendCompletePacket;
+        ipv4.arp.proxyArpInterfaces = default(""); //*.proxyARP = false;
 
     gates:
         inout gateControlPlane[] @labels(ControlPlane);
@@ -86,10 +88,10 @@ module Open_Flow_Switch
 
         OF_Switch: OF_Switch {
             @display("p=442,43");
-            sendCompletePacket = sendCompletePacket;
-            gates:
-                dataPlaneOut[sizeof(gateDataPlane)];
-                dataPlaneIn[sizeof(gateDataPlane)];
+
+//            gates:
+//                dataPlaneOut[sizeof(this.gateDataPlane)];
+//                dataPlaneIn[sizeof(this.gateDataPlane)];
         }
 
     connections allowunconnected:
@@ -125,8 +127,8 @@ module Open_Flow_Switch
 
         for i=0..sizeof(gateDataPlane)-1 {
             etherMAC[i].phys <--> gateDataPlane[i];
-            OF_Switch.dataPlaneOut[i] --> etherMAC[i].upperLayerIn;
-            etherMAC[i].upperLayerOut --> OF_Switch.dataPlaneIn[i];
+            OF_Switch.dataPlaneOut++ --> etherMAC[i].upperLayerIn;
+            etherMAC[i].upperLayerOut --> OF_Switch.dataPlaneIn++;
         }
 
         at.out++ --> OF_Switch.controlPlaneIn;
