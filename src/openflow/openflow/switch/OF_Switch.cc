@@ -618,9 +618,8 @@ void OF_Switch::executePacketOutAction(const ofp_action_header *action, Packet *
     } else if (outport == OFPP_FLOOD){
         EV << "Flood Packet\n" << '\n';
         unsigned int n = gateSize("dataPlaneOut");
-        auto indexPort = getIndexFromId(inport);
         for (unsigned int i=0; i<n; ++i) {
-            if(i != indexPort && !(portVector[i].state & OFPPS_BLOCKED)){
+            if(portVector[i].interfaceId != inport && !(portVector[i].state & OFPPS_BLOCKED)){
                 send(pktFrame->dup(), "dataPlaneOut", i);
             }
         }

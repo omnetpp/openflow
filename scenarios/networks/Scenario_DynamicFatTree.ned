@@ -8,7 +8,7 @@ import openflow.nodes.DynamicFatTree;
 import openflow.openflow.controller.Open_Flow_Controller;
 import openflow.utility.OpenFlowGraphAnalyzer;
 import openflow.utility.StaticSpanningTree;
-
+import inet.node.ethernet.Eth40G;
 
 network Scenario_DynamicFatTree
 {
@@ -16,11 +16,11 @@ network Scenario_DynamicFatTree
 
 
     types:
-        channel backboneline extends ThruputMeteringChannel
+        channel backboneline extends Eth40G
         {
-            delay = 1us;
-            datarate = 40Gbps;
-            thruputDisplayFormat = "u";
+            length = 200m; // delay = 1us;
+            //datarate = 40Gbps;
+            //thruputDisplayFormat = "u";
         }
     submodules:
 

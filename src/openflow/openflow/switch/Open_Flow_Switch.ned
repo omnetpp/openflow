@@ -117,20 +117,19 @@ module Open_Flow_Switch
         tn.out++ --> ipv4.transportIn;
         tn.in++ <-- ipv4.transportOut;
 
-
+        at.out++ --> OF_Switch.controlPlaneIn;
+        OF_Switch.controlPlaneOut --> at.in++;
+        
         for i=0..sizeof(gateControlPlane)-1 {
             eth[i].upperLayerOut --> li.in++;
             eth[i].upperLayerIn <-- li.out++;
-            eth[i].phys <--> gateControlPlane[i];
+            eth[i].phys <--> { @display("m=s"); } <--> gateControlPlane[i];
         }
 
 
         for i=0..sizeof(gateDataPlane)-1 {
-            etherMAC[i].phys <--> gateDataPlane[i];
             OF_Switch.dataPlaneOut++ --> etherMAC[i].upperLayerIn;
-            etherMAC[i].upperLayerOut --> OF_Switch.dataPlaneIn++;
+            etherMAC[i].upperLayerOut --> OF_Switch.dataPlaneIn++;            
+            etherMAC[i].phys <--> { @display("m=s"); } <--> gateDataPlane[i];
         }
-
-        at.out++ --> OF_Switch.controlPlaneIn;
-        OF_Switch.controlPlaneOut --> at.in++;
 }
