@@ -46,7 +46,6 @@ void PingAppRandom::handleSelfMessage(cMessage *msg){
 
             if (connectAddressAux != connectAddress && currentSocket != nullptr) {
                 currentSocket->close();
-                delete currentSocket;
                 currentSocket = nullptr;
             }
 
@@ -56,6 +55,7 @@ void PingAppRandom::handleSelfMessage(cMessage *msg){
                 currentSocket = new Ipv4Socket(gate("socketOut"));
                 currentSocket->bind(icmp, L3Address());
                 currentSocket->setCallback(this);
+                socketMap.addSocket(currentSocket);
             }
 
             connectAddress = connectAddressAux;

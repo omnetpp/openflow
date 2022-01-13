@@ -18,6 +18,8 @@
 #include "openflow/messages/OFP_Packet_In_m.h"
 #include "openflow/messages/OFP_Packet_Out_m.h"
 #include "openflow/messages/OFP_Flow_Mod_m.h"
+#include "inet/common/ModuleRefByPar.h"
+#include "inet/networklayer/contract/IInterfaceTable.h"
 #include <vector>
 
 //#include "inet/applications/pingapp/PingPayload_m.h"
@@ -80,12 +82,17 @@ void OF_Switch::initialize(int stage){
     }
 
     else if (stage == INITSTAGE_NETWORK_CONFIGURATION) {
+        ModuleRefByPar<IInterfaceTable> inet_ift;
+        inet_ift.reference(this, "interfaceTableModule", true);
+
         portVector.resize(gateSize("dataPlaneIn"));
         for(unsigned int i=0;i<portVector.size();i++){
             portVector[i].port_no = i+1;
-            cModule *ethernetModule = gate("dataPlaneOut",i)->getNextGate()->getOwnerModule()->getSubmodule("mac");
-            if(dynamic_cast<EthernetMacBase *>(ethernetModule) != NULL) {
-                auto nic = (EthernetMacBase*)ethernetModule;
+            auto iface = getContainingNicModule(gate("dataPlaneOut",i)->getNextGate()->getOwnerModule());
+            portVector[i].interfaceId =  iface->getInterfaceId();
+            cModule *ethernetMacModule = gate("dataPlaneOut",i)->getNextGate()->getOwnerModule()->getSubmodule("mac");
+            if(dynamic_cast<EthernetMacBase *>(ethernetMacModule) != nullptr) {
+                auto nic = (EthernetMacBase*)ethernetMacModule;
                 uint64_t tmpHw = nic->getMacAddress().getInt();
                 memcpy(portVector[i].hw_addr,&tmpHw, sizeof tmpHw);
             }
@@ -146,9 +153,13 @@ void OF_Switch::handleStartOperation(LifecycleOperation *operation)
     int index = 0;
     for (int i = 0 ; i < interfaceTable->getNumInterfaces(); i ++) {
         auto e = interfaceTable->getInterface(i);
-        if (strstr(e->getInterfaceName(),"eth") != nullptr){
-            ifaceIndex[e->getInterfaceId()] = index;
-            index++;
+        auto it = ifaceIndex.find(e->getInterfaceId());
+        if (it == ifaceIndex.end()) {
+            // if the interface is alredy in the list ignore it
+            if (strstr(e->getInterfaceName(),"eth") != nullptr){
+                ifaceIndex[e->getInterfaceId()] = index;
+                index++;
+            }
         }
     }
 
@@ -286,6 +297,33 @@ void OF_Switch::processQueuedMsg(Packet *data_msg){
     }
 }
 
+static bool iteratePacketDissector(const Ptr<const PacketDissector::ProtocolDataUnit> &unit, int &seqNumber, int &identifier) {
+    for (const auto& chunkAux : unit->getChunks()) {
+        const auto c = dynamicPtrCast<const PacketDissector::ProtocolDataUnit>(chunkAux);
+        if (c != nullptr) {
+            if(iteratePacketDissector(c, seqNumber, identifier))
+                return true;
+        }
+        else if (chunkAux->getChunkType() == Chunk::CT_SEQUENCE) {
+            for (const auto& elementChunk : staticPtrCast<const SequenceChunk>(chunkAux)->getChunks()) {
+                if (dynamic_cast<const IcmpEchoRequest *>(elementChunk.get())) {
+                    seqNumber = dynamic_cast<const IcmpEchoRequest *>(elementChunk.get())->getSeqNumber();
+                    identifier = dynamic_cast<const IcmpEchoRequest *>(elementChunk.get())->getIdentifier();
+                    return true;
+                }
+            }
+        }
+        else if (chunkAux->getChunkType() == Chunk::CT_FIELDS) {
+            auto icmp = dynamicPtrCast<const IcmpEchoRequest>(chunkAux);
+            if (icmp) {
+                seqNumber = icmp->getSeqNumber();
+                identifier = icmp->getIdentifier();
+                return true;
+            }
+        }
+    }
+    return false;
+}
 
 static bool chekIcmpEchoRequest(Packet *pkt, int &seqNumber, int &identifier) {
     PacketDissector::PduTreeBuilder pduTreeBuilder;
@@ -299,13 +337,26 @@ static bool chekIcmpEchoRequest(Packet *pkt, int &seqNumber, int &identifier) {
     for (const auto& chunk : protocolDataUnit->getChunks()) {
         if (auto childLevel = dynamicPtrCast<const PacketDissector::ProtocolDataUnit>(chunk)) {
             for (const auto& chunkAux : childLevel->getChunks()) {
-                if (chunkAux->getChunkType() == Chunk::CT_SEQUENCE) {
+                const auto c = dynamicPtrCast<const PacketDissector::ProtocolDataUnit>(chunkAux);
+                if (c != nullptr) {
+                    if (iteratePacketDissector(c, seqNumber, identifier))
+                        return true;
+                }
+                else if (chunkAux->getChunkType() == Chunk::CT_SEQUENCE) {
                     for (const auto& elementChunk : staticPtrCast<const SequenceChunk>(chunkAux)->getChunks()) {
                         if (dynamic_cast<const IcmpEchoRequest *>(elementChunk.get())) {
                             seqNumber = dynamic_cast<const IcmpEchoRequest *>(elementChunk.get())->getSeqNumber();
                             identifier = dynamic_cast<const IcmpEchoRequest *>(elementChunk.get())->getIdentifier();
                             return true;
                         }
+                    }
+                }
+                else if (chunkAux->getChunkType() == Chunk::CT_FIELDS) {
+                    auto icmp = dynamicPtrCast<const IcmpEchoRequest>(chunkAux);
+                    if (icmp) {
+                        seqNumber = icmp->getSeqNumber();
+                        identifier = icmp->getIdentifier();
+                        return true;
                     }
                 }
             }
@@ -317,6 +368,14 @@ static bool chekIcmpEchoRequest(Packet *pkt, int &seqNumber, int &identifier) {
                     identifier = dynamic_cast<const IcmpEchoRequest *>(elementChunk.get())->getIdentifier();
                     return true;
                 }
+            }
+        }
+        else if (chunk->getChunkType() == Chunk::CT_FIELDS) {
+            auto icmp = dynamicPtrCast<const IcmpEchoRequest>(chunk);
+            if (icmp) {
+                seqNumber = icmp->getSeqNumber();
+                identifier = icmp->getIdentifier();
+                return true;
             }
         }
     }
@@ -559,8 +618,9 @@ void OF_Switch::executePacketOutAction(const ofp_action_header *action, Packet *
     } else if (outport == OFPP_FLOOD){
         EV << "Flood Packet\n" << '\n';
         unsigned int n = gateSize("dataPlaneOut");
+        auto indexPort = getIndexFromId(inport);
         for (unsigned int i=0; i<n; ++i) {
-            if(i != inport && !(portVector[i].state & OFPPS_BLOCKED)){
+            if(i != indexPort && !(portVector[i].state & OFPPS_BLOCKED)){
                 send(pktFrame->dup(), "dataPlaneOut", i);
             }
         }
