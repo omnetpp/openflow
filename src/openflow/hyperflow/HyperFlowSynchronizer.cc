@@ -120,7 +120,7 @@ void HyperFlowSynchronizer::handleSyncRequest(Packet *pkt){
     std::list<DataChannelEntry> tempDataChannel = std::list<DataChannelEntry>();
     std::list<DataChannelEntry>::iterator iterData;
     int counter = dataChannelSizeCache - msg->getLastSyncCounter();
-    for(iterData=dataChannel.begin();counter != 0 && iterData != dataChannel.end();iterData++){
+    for(iterData=dataChannel.begin();counter != 0 && iterData != dataChannel.end(); ++iterData){
         counter--;
         tempDataChannel.push_back(*iterData);
     }

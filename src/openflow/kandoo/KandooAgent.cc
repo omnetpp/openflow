@@ -175,7 +175,7 @@ void KandooAgent::sendReplyToSwitchAuthoritive(std::string switchId, KandooEntry
 
     TcpSocket * tempSocket = NULL;
     std::list<SwitchControllerMapping>::iterator iter;
-    for(iter = switchControllerMapping.begin(); iter != switchControllerMapping.end();iter++){
+    for(iter = switchControllerMapping.begin(); iter != switchControllerMapping.end(); ++iter){
         if(strcmp(iter->switchId.c_str(),switchId.c_str())==0){
             tempSocket = iter->socket;
             break;

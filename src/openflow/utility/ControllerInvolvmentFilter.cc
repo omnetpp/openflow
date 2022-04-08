@@ -24,14 +24,21 @@ void ControllerInvolvementFilter::receiveSignal(cComponent *source, simsignal_t 
 }
 
 void ControllerInvolvementFilter::handleMessageWhenUp(cMessage *msg) {
-    error("this module doesn't handle messages, it runs only in initialize()");
+    throw cRuntimeError("this module doesn't handle messages, it runs only in initialize()");
 }
 
 void ControllerInvolvementFilter::finish(){
-    std::map<long,int>::iterator iterMap;
+/*    std::map<long,int>::iterator iterMap;
     for(iterMap = controllerInvolvements.begin(); iterMap != controllerInvolvements.end(); iterMap++){
         std::stringstream name;
         name << "controllerInvolvementsFor-" << iterMap->first;
         recordScalar(name.str().c_str(),iterMap->second);
+    }
+*/
+
+    for(const auto & elem : controllerInvolvements){
+        std::stringstream name;
+        name << "controllerInvolvementsFor-" << elem.first;
+        recordScalar(name.str().c_str(), elem.second);
     }
 }

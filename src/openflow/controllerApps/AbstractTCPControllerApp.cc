@@ -28,7 +28,6 @@ void AbstractTCPControllerApp::initialize(int stage){
         lastQueueSize =0;
         lastChangeTime=0.0;
     }
-
 }
 
 void AbstractTCPControllerApp::handleMessageWhenUp(cMessage *msg){
@@ -113,17 +112,30 @@ void AbstractTCPControllerApp::calcAvgQueueSize(int size){
 void AbstractTCPControllerApp::finish(){
     // record statistics
 
-    std::map<int,int>::iterator iterMap;
-    for(iterMap = packetsPerSecond.begin(); iterMap != packetsPerSecond.end(); iterMap++){
+    //std::map<int,int>::iterator iterMap;
+    /*
+    for(auto iterMap = packetsPerSecond.begin(); iterMap != packetsPerSecond.end(); ++iterMap){
         stringstream name;
         name << "packetsPerSecondAt-" << iterMap->first;
         recordScalar(name.str().c_str(),iterMap->second);
     }
 
-    std::map<int,double>::iterator iterMap2;
-    for(iterMap2 = avgQueueSize.begin(); iterMap2 != avgQueueSize.end(); iterMap2++){
+    //std::map<int,double>::iterator iterMap2;
+    for(auto iterMap2 = avgQueueSize.begin(); iterMap2 != avgQueueSize.end(); ++iterMap2){
         stringstream name;
         name << "avgQueueSizeAt-" << iterMap2->first;
         recordScalar(name.str().c_str(),(iterMap2->second/1.0));
+    }
+    */
+    for(auto elem : packetsPerSecond){
+        stringstream name;
+        name << "packetsPerSecondAt-" << elem.first;
+        recordScalar(name.str().c_str(),elem.second);
+    }
+
+    for(auto elem :avgQueueSize){
+        stringstream name;
+        name << "avgQueueSizeAt-" << elem.first;
+        recordScalar(name.str().c_str(),(elem.second/1.0));
     }
 }

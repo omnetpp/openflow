@@ -218,29 +218,29 @@ std::list<LLDPPathSegment> LLDPBalancedMinHop::computeBalancedMinHopPath(std::st
 
     std::string u;
     while(!q.empty()){
-
         u = q.top().first;
         q.pop();
 
         tempPath.clear();
         int alt;
-        std::vector<LLDPMib>::iterator iterList;
-        for(iterList = verticies[u].begin();iterList!=verticies[u].end();iterList++){
-                alt = dist[u]+1;
-                if(alt < dist[iterList->getDstId()]){
-                    tempPath.clear();
-                    dist[iterList->getDstId()] = alt;
-                    seg = LLDPPathSegment();
-                    seg.chassisId = u;
-                    seg.outport= (iterList)->getSrcPort();
-                    prev[(iterList)->getDstId()]=seg;
-                    q.push(pair<string,int>(iterList->getDstId(),alt));
-                } else if (alt == dist[iterList->getDstId()]){
-                    seg = LLDPPathSegment();
-                    seg.chassisId = u;
-                    seg.outport= (iterList)->getSrcPort();
-                    tempPath.push_back(pair<std::string,LLDPPathSegment>(iterList->getDstId(),seg));
-                }
+        //std::vector<LLDPMib>::iterator iterList;
+        for(auto iterList = verticies[u].begin();iterList!=verticies[u].end(); ++iterList){
+            alt = dist[u]+1;
+            if(alt < dist[iterList->getDstId()]){
+                tempPath.clear();
+                dist[iterList->getDstId()] = alt;
+                seg = LLDPPathSegment();
+                seg.chassisId = u;
+                seg.outport= (iterList)->getSrcPort();
+                prev[(iterList)->getDstId()]=seg;
+                q.push(pair<string,int>(iterList->getDstId(),alt));
+            }
+            else if (alt == dist[iterList->getDstId()]) {
+                seg = LLDPPathSegment();
+                seg.chassisId = u;
+                seg.outport= (iterList)->getSrcPort();
+                tempPath.push_back(pair<std::string,LLDPPathSegment>(iterList->getDstId(),seg));
+            }
         }
 
         if (!tempPath.empty()){
@@ -253,10 +253,7 @@ std::list<LLDPPathSegment> LLDPBalancedMinHop::computeBalancedMinHopPath(std::st
                 prev[tempPath[rand].first]= tempPath[rand].second;
                 q.push(pair<string,int>(tempPath[rand].first,alt));
             }
-
         }
-
-
     }
 
     //back track and insert into list
@@ -273,7 +270,8 @@ std::list<LLDPPathSegment> LLDPBalancedMinHop::computeBalancedMinHopPath(std::st
     //check if there was route from src to dst
     if(strcmp(srcId.c_str(),trg.c_str()) != 0){
         result.clear();
-    }else{
+    }
+    else{
         //add to cache
         routeCache[std::pair<std::string,std::string>(srcId,dstId)]=result;
     }

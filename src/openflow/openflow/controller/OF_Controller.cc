@@ -381,7 +381,7 @@ std::vector<AbstractControllerApp *>* OF_Controller::getAppList() {
 void OF_Controller::finish(){
     // record statistics
     recordScalar("numPacketIn", numPacketIn);
-
+/*
     std::map<int,int>::iterator iterMap;
     for(iterMap = packetsPerSecond.begin(); iterMap != packetsPerSecond.end(); iterMap++){
         stringstream name;
@@ -395,6 +395,19 @@ void OF_Controller::finish(){
         name << "avgQueueSizeAt-" << iterMap2->first;
         recordScalar(name.str().c_str(),(iterMap2->second/1.0));
     }
+*/
+    for(const auto &elem : packetsPerSecond){
+        stringstream name;
+        name << "packetsPerSecondAt-" << elem.first;
+        recordScalar(name.str().c_str(), elem.second);
+    }
+    for(const auto &elem : avgQueueSize){
+        stringstream name;
+        name << "avgQueueSizeAt-" << elem.first;
+        recordScalar(name.str().c_str(),(elem.second/1.0));
+    }
+
+
 }
 
 

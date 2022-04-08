@@ -28,15 +28,12 @@ void Flow_Table::addEntry(Flow_Table_Entry entry) {
 Flow_Table_Entry* Flow_Table::lookup(oxm_basic_match &match) {
     EV << "Looking through " << entryList.size() << " Flow Entries!" << '\n';
 
-    for(auto iter =entryList.begin();iter != entryList.end();++iter){
-
+    for(auto iter = entryList.begin(); iter != entryList.end();){
         //check if flow has expired
         if ((*iter).getExpiresAt() < simTime()){
             iter = entryList.erase(iter);
             continue;
         }
-
-
         if (flow_fields_match(match, (*iter).getMatch(), (*iter).getMatch().wildcards)){
             //adapt idle timer filed if neccessary
             if ((*iter).getIdleTimeout() != 0){
@@ -44,6 +41,7 @@ Flow_Table_Entry* Flow_Table::lookup(oxm_basic_match &match) {
             }
             return &(*iter);
         }
+        ++iter;
     }
     return NULL;
 }

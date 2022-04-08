@@ -204,9 +204,9 @@ void HyperFlowAgent::handleCheckAlive(){
     std::list<std::string>::iterator iterKnownControllers;
     std::list<ControlChannelEntry>::iterator iterControl;
     bool found = false;
-    for(iterKnownControllers=knownControllers.begin();iterKnownControllers!=knownControllers.end();iterKnownControllers++){
+    for(iterKnownControllers=knownControllers.begin();iterKnownControllers!=knownControllers.end(); ++iterKnownControllers){
         found = false;
-        for(iterControl=controlChannel.begin();iterControl!=controlChannel.end();iterControl++){
+        for(iterControl=controlChannel.begin();iterControl!=controlChannel.end(); ++iterControl){
             if(strcmp(iterKnownControllers->c_str(),(*iterControl).controllerId.c_str()) == 0){
                 found=true;
                 break;

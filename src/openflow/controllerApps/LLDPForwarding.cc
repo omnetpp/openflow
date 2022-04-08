@@ -241,7 +241,7 @@ void LLDPForwarding::computePath(std::string srcId, std::string dstId,std::list<
         }
 
         int alt;
-        std::vector<LLDPMib>::iterator iterList;
+        /*std::vector<LLDPMib>::iterator iterList;
         for(iterList = verticies[u].begin();iterList!=verticies[u].end();iterList++){
             if(visited.count(iterList->getDstId())<=0){
                 alt = dist[u]+1;
@@ -254,8 +254,21 @@ void LLDPForwarding::computePath(std::string srcId, std::string dstId,std::list<
                     q.push(pair<string,int>(iterList->getDstId(),alt));
                 }
             }
-        }
+        }*/
 
+        for(const auto &elem : verticies[u]) {
+            if(visited.count(elem.getDstId())<=0) {
+                alt = dist[u]+1;
+                if(alt < dist[elem.getDstId()]) {
+                    dist[elem.getDstId()] = alt;
+                    seg = LLDPPathSegment();
+                    seg.chassisId = u;
+                    seg.outport= elem.getSrcPort();
+                    prev[elem.getDstId()]=seg;
+                    q.push(pair<string,int>(elem.getDstId(),alt));
+                }
+            }
+        }
         //add u to visited
         visited[u] = true;
     }
