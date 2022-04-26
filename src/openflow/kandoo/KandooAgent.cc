@@ -54,7 +54,7 @@ void KandooAgent::handleStartOperation(LifecycleOperation *operation) {
 
 
 void KandooAgent::handleMessageWhenUp(cMessage *msg){
-    AbstractTCPControllerApp::handleMessage(msg);
+    AbstractTCPControllerApp::handleMessageWhenUp(msg);
 
     if (msg->isSelfMessage()){
         if (msg->getKind()== MSGKIND_KNCONNECT){
@@ -62,10 +62,9 @@ void KandooAgent::handleMessageWhenUp(cMessage *msg){
             const char *connectAddressRootController = par("connectAddressRootController");
             int connectPort = par("connectPortRootController");
             socket.connect(L3AddressResolver().resolve(connectAddressRootController), connectPort);
-            delete msg;
         }
     }
-
+    delete msg;
 }
 
 

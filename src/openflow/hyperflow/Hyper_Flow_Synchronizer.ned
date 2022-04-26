@@ -7,7 +7,8 @@ import inet.networklayer.contract.INetworkLayer;
 import inet.networklayer.contract.IRoutingTable;
 import inet.transportlayer.contract.ITcp;
 import inet.common.MessageDispatcher;
-
+import inet.linklayer.ethernet.contract.IEthernetLayer;
+import inet.protocolelement.contract.IProtocolLayer;
 //
 // TODO documentation
 //
@@ -16,7 +17,7 @@ module Hyper_Flow_Synchronizer
     parameters:
         @networkNode();
         @labels(node,ethernet-node);
-        @display("i=device/server;bgb=840,433;i2=openflow/OpenFlow-Logo-small");
+        @display("i=device/server;bgb=839.358,713.18;i2=openflow/OpenFlow-Logo-small");
         bool hasTcp = default(firstAvailableOrEmpty("Tcp", "TcpLwip", "TcpNsc") != "");
 		//submodules
         //string tcpType = default("TCP");  // tcp implementation (e.g. TCP, TCP_old, TCP_NSC)
@@ -25,7 +26,7 @@ module Hyper_Flow_Synchronizer
 
         string networkLayerType = default("IPv4NetworkLayer");
         string routingTableType = default("IPv4RoutingTable");
-
+        ethernet.registerProtocol = default(true);
         bool forwarding = default(false);
         bool multicastForwarding = default(false);
         string routingFile = default("");
@@ -50,11 +51,27 @@ module Hyper_Flow_Synchronizer
         }
         nl: MessageDispatcher {
             parameters:
-                @display("p=400,300;b=580,5,,,,1");
+                @display("p=400,300;b=500,5,,,,1");
         }
+
+        cb: MessageDispatcher {
+            @display("p=400,357;b=500,5");
+        }
+        bl: MessageDispatcher {
+            @display("p=400,436;b=500,5");
+        }
+
         li: MessageDispatcher {
             parameters:
-                @display("p=400,348;b=580,5,,,,1");
+                @display("p=400,532;b=500,5,,,,1");
+        }
+
+        bridging: <default("")> like IProtocolLayer if typename != "" {
+            @display("p=297,405");
+        }
+
+        ethernet: <default(sizeof(ethg) > 0 ? "EthernetEncapsulation" : "")> like IEthernetLayer if typename != "" {
+            @display("p=352,478");
         }
 
         interfaceTable: InterfaceTable {
@@ -72,7 +89,7 @@ module Hyper_Flow_Synchronizer
         }
         eth[sizeof(ethg)]: EthernetInterface {
             parameters:
-                @display("p=491,399,row,90;q=txQueue");
+                @display("p=374.4195,613.0605,row,90;q=txQueue");
         }
         HyperFlowSynchronizer: HyperFlowSynchronizer {
             @display("p=213,44");
@@ -85,8 +102,8 @@ module Hyper_Flow_Synchronizer
         tn.out++ --> nl.in++;
         tn.in++ <-- nl.out++;
 
-        nl.out++ --> li.in++;
-        nl.in++ <-- li.out++;
+        bl.out++ --> li.in++;
+        li.out++ --> bl.in++;
 
         at.out++ --> tcp.appIn;
         at.in++ <-- tcp.appOut;
@@ -97,8 +114,26 @@ module Hyper_Flow_Synchronizer
         ipv4.ifIn <-- nl.out++;
         ipv4.ifOut --> nl.in++;
 
+        cb.out++ --> bridging.upperLayerIn if exists(bridging);
+        bridging.upperLayerOut --> cb.in++ if exists(bridging);
+
+        cb.out++ --> bl.in++ if !exists(bridging);
+        bl.out++ --> cb.in++ if !exists(bridging);
+
         tn.out++ --> ipv4.transportIn;
         tn.in++ <-- ipv4.transportOut;
+
+        bridging.lowerLayerOut --> bl.in++ if exists(bridging);
+        bl.out++ --> bridging.lowerLayerIn if exists(bridging);
+
+        cb.out++ --> nl.in++;
+        cb.in++ <-- nl.out++;
+
+        bl.out++ --> ethernet.upperLayerIn if exists(ethernet);
+        ethernet.upperLayerOut --> bl.in++ if exists(ethernet);
+
+        ethernet.lowerLayerOut --> li.in++ if exists(ethernet);
+        li.out++ --> ethernet.lowerLayerIn if exists(ethernet);
 
         for i=0..sizeof(ethg)-1 {
             eth[i].upperLayerOut --> li.in++;

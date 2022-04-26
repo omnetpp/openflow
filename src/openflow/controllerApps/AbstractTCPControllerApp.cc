@@ -1,5 +1,6 @@
 #include "openflow/controllerApps/AbstractTCPControllerApp.h"
 #include "inet/common/socket/SocketTag_m.h"
+#include "inet/transportlayer/contract/tcp/TcpCommand_m.h"
 
 #define MSGKIND_TCPSERVICETIME                 3098
 
@@ -52,14 +53,17 @@ void AbstractTCPControllerApp::handleMessageWhenUp(cMessage *msg){
                 scheduleAt(simTime()+serviceTime, event);
             }
             calcAvgQueueSize(msgList.size());
-
             //delete the msg for efficiency
-            delete msg;
+            //delete msg;
         }
 
 
     } else {
         //imlement service time
+
+        if (msg->getKind() != TCP_I_DATA &&  msg->getKind() != TCP_I_URGENT_DATA)
+            return;
+
         auto data_msg = dynamic_cast<Packet *>(msg);
         if (data_msg == nullptr)
             throw cRuntimeError("AbstractTCPControllerApp::handleMessage not of type Packet");

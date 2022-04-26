@@ -70,12 +70,18 @@ void HyperFlowSynchronizer::handleMessageWhenUp(cMessage *msg){
         delete msg;
     } else {
         //imlement service time
+        auto recPacket = dynamic_cast<Packet *>(msg);
+        if (recPacket == nullptr) {
+            delete msg;
+            return;
+        }
+
         if (busy) {
-            msgList.push_back(msg);
+            msgList.push_back(recPacket);
         }else{
             busy = true;
             cMessage *event = new cMessage("event");
-            event->setContextPointer(msg);
+            event->setContextPointer(recPacket);
             scheduleAt(simTime()+serviceTime, event);
         }
         emit(queueSize,msgList.size());

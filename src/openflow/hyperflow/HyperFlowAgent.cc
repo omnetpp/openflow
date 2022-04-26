@@ -53,7 +53,7 @@ void HyperFlowAgent::handleStartOperation(LifecycleOperation *operation)
 }
 
 void HyperFlowAgent::handleMessageWhenUp(cMessage *msg){
-    AbstractTCPControllerApp::handleMessage(msg);
+    AbstractTCPControllerApp::handleMessageWhenUp(msg);
 
     if (msg->isSelfMessage()){
         if (msg->getKind()==MSGKIND_REPORTINEVERY){
@@ -61,20 +61,17 @@ void HyperFlowAgent::handleMessageWhenUp(cMessage *msg){
             reportIn->setKind(MSGKIND_REPORTINEVERY);
             scheduleAt(simTime()+checkReportInEvery, reportIn);
             sendReportIn();
-            delete msg;
         } else if (msg->getKind()== MSGKIND_SYNCEVERY){
             cMessage *sync = new cMessage("sync");
             sync->setKind(MSGKIND_SYNCEVERY);
             scheduleAt(simTime()+checkSyncEvery, sync);
             sendSyncRequest();
-            delete msg;
         } else if (msg->getKind()== MSGKIND_CHECKALIVEEVERY){
             //start checking alive
             cMessage *checkAlive = new cMessage("checkAlive");
             checkAlive->setKind(MSGKIND_CHECKALIVEEVERY);
             scheduleAt(simTime()+checkAliveEvery, checkAlive);
             handleCheckAlive();
-            delete msg;
         } else if (msg->getKind()== MSGKIND_HFCONNECT){
             //init socket to synchronizer
             const char *connectAddressHyperFlowSynchronizer = par("connectAddressHyperFlowSynchronizer");
@@ -83,7 +80,7 @@ void HyperFlowAgent::handleMessageWhenUp(cMessage *msg){
         }
     }
 
-
+    delete msg;
 }
 
 
