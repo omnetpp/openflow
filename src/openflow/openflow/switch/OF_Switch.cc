@@ -6,7 +6,7 @@
 #include "inet/networklayer/ipv4/IcmpHeader.h"
 #include "inet/common/Protocol.h"
 #include "inet/common/ProtocolTag_m.h"
-
+#include "inet/common/IProtocolRegistrationListener.h"
 #include "openflow/openflow/switch/OF_Switch.h"
 #include "openflow/openflow/protocol/openflow.h"
 
@@ -85,12 +85,14 @@ void OF_Switch::initialize(int stage){
         ModuleRefByPar<IInterfaceTable> inet_ift;
         inet_ift.reference(this, "interfaceTableModule", true);
 
-        portVector.resize(gateSize("dataPlaneIn"));
+        parent = this->getParentModule();
+
+        portVector.resize(parent->gateSize("gateDataPlane$i"));
         for(unsigned int i=0;i<portVector.size();i++){
             portVector[i].port_no = i+1;
-            auto iface = getContainingNicModule(gate("dataPlaneOut",i)->getNextGate()->getOwnerModule());
+            auto iface = getContainingNicModule(parent->gate("gateDataPlane$i",i)->getNextGate()->getOwnerModule());
             portVector[i].interfaceId =  iface->getInterfaceId();
-            cModule *ethernetMacModule = gate("dataPlaneOut",i)->getNextGate()->getOwnerModule()->getSubmodule("mac");
+            cModule *ethernetMacModule = parent->gate("gateDataPlane$i",i)->getNextGate()->getOwnerModule()->getSubmodule("mac");
             if(dynamic_cast<EthernetMacBase *>(ethernetMacModule) != nullptr) {
                 auto nic = (EthernetMacBase*)ethernetMacModule;
                 uint64_t tmpHw = nic->getMacAddress().getInt();
@@ -122,8 +124,10 @@ void OF_Switch::initialize(int stage){
     }
     else if (stage == INITSTAGE_APPLICATION_LAYER) {
         //init socket to controller
+        registerProtocol(Protocol::unknown, gate("dataPlaneOut"), gate("dataPlaneIn"));
         const char *localAddress = par("localAddress");
         int localPort = par("localPort");
+        socket.setCallback(this);
         socket.bind(*localAddress ? L3Address(localAddress) : L3Address(), localPort);
         socket.setOutputGate(gate("controlPlaneOut"));
         //socket.setDataTransferMode(TCP_TRANSFER_OBJECT);
@@ -138,10 +142,9 @@ void OF_Switch::handleStartOperation(LifecycleOperation *operation)
 
 
     // search the interfaces in the data plane
-
-    for (int i = 0; i < gateSize("dataPlaneOut");i++)
-    {
-        auto gateAux = gate("dataPlaneOut", i);
+    int gatePlaneSize = parent->gateSize("gateDataPlane$i");
+    for (int i = 0; i < gatePlaneSize;i++) {
+        auto gateAux = parent->gate("gateDataPlane$i", i);
         auto mod = gateAux->getPathEndGate()->getOwnerModule();
         auto iface = getContainingNicModule(mod);
         if (iface == nullptr)
@@ -149,6 +152,9 @@ void OF_Switch::handleStartOperation(LifecycleOperation *operation)
         ifaceIndex[iface->getInterfaceId()] = i;
         controlPlaneIndex[iface->getInterfaceId()] = i;
     }
+
+    if (gatePlaneSize != controlPlaneIndex.size())
+        throw cRuntimeError("Check size of gateDataPlane == controlPlaneIndex.size()");
 
     int index = 0;
     for (int i = 0 ; i < interfaceTable->getNumInterfaces(); i ++) {
@@ -173,6 +179,51 @@ void OF_Switch::handleStartOperation(LifecycleOperation *operation)
     simtime_t start = par("connectAt");
     simtime_t starOperation = std::max(simTime(), start);
     scheduleAt(starOperation, initiateConnection);
+}
+
+void OF_Switch::socketEstablished(TcpSocket *)
+{
+    // *redefine* to perform or schedule first sending
+    EV_INFO << "connected\n";
+}
+
+void OF_Switch::socketDataArrived(TcpSocket *, Packet *msg, bool)
+{
+    // *redefine* to perform or schedule next sending
+    //imlement service time
+    if (busy) {
+        msgList.push_back(msg);
+    } else {
+        busy = true;
+        cMessage *event = new cMessage("event");
+        event->setKind(MSGKIND_SERVICETIME);
+        event->setContextPointer(msg);
+        scheduleAt(simTime()+serviceTime, event);
+    }
+    emit(queueSize,msgList.size());
+    emit(bufferSize,buffer.size());
+}
+
+void OF_Switch::socketPeerClosed(TcpSocket *socket_)
+{
+    ASSERT(socket_ == &socket);
+    // close the connection (if not already closed)
+    if (socket.getState() == TcpSocket::PEER_CLOSED) {
+        EV_INFO << "remote TCP closed, closing here as well\n";
+        socket.close();
+    }
+}
+
+void OF_Switch::socketClosed(TcpSocket *)
+{
+    // *redefine* to start another session etc.
+    EV_INFO << "connection closed\n";
+}
+
+void OF_Switch::socketFailure(TcpSocket *, int code)
+{
+    // subclasses may override this function, and add code try to reconnect after a delay.
+    EV_WARN << "connection broken\n";
 }
 
 
@@ -208,9 +259,9 @@ void OF_Switch::handleMessageWhenUp(cMessage *msg){
         //delete the msg for efficiency
         delete msg;
     } else {
-        if(msg->getKind() == TCP_I_ESTABLISHED){
+        if(msg->arrivedOn("controlPlaneIn")){
             socket.processMessage(msg);
-        }else{
+        } else {
             //imlement service time
             if (busy) {
                 msgList.push_back(msg);
@@ -242,6 +293,7 @@ void OF_Switch::connect(const char *addressToConnect){
 
     EV << "Sending Hello to" << connectAddress <<" \n";
 
+    socket.setCallback(this);
     socket.connect(L3AddressResolver().resolve(connectAddress), connectPort);
     auto hello = makeShared<OFP_Hello>();
     auto pktHello = new Packet("Hello");
@@ -468,7 +520,10 @@ void OF_Switch::processFrame(Packet *pkt){
            auto indexPort = getIndexFromId(outport);
            if (indexPort == -1)
                throw cRuntimeError("Unknown dataPlaneOut sending port/gate");
-           send(pkt, "dataPlaneOut", indexPort);
+           pkt->addTagIfAbsent<PacketProtocolTag>()->setProtocol(&Protocol::unknown);
+           pkt->addTagIfAbsent<InterfaceReq>()->setInterfaceId(outport);
+           send(pkt, "dataPlaneOut");
+           //send(pkt, "dataPlaneOut", indexPort);
        }
    } else {
        if(hash !=0){
@@ -501,12 +556,15 @@ void OF_Switch::handleFeaturesRequestMessage(Packet *pktOf){
     featuresReply->setDatapath_id(mac.str().c_str());
     featuresReply->setN_buffers(buffer.getCapacity());
     featuresReply->setN_tables(1);
-    featuresReply->setPortsArraySize(gateSize("dataPlaneOut"));
+    featuresReply->setPortsArraySize(parent->gateSize("gateDataPlane$o"));
+    if (featuresReply->getPortsArraySize() != controlPlaneIndex.size())
+        throw cRuntimeError("Check port size gateSize(gateDataPlane$o) !=  controlPlaneIndex.size()");
     for (auto elem : controlPlaneIndex) {
         if (elem.second < 0 || elem.second >=  featuresReply->getPortsArraySize())
             throw cRuntimeError("Index is incorrect");
         featuresReply->setPorts(elem.second, elem.first);
     }
+
     featuresReply->setChunkLength(B(32));
     auto pktReply = new Packet("FeaturesReply");
     pktReply->insertAtFront(featuresReply);
@@ -617,10 +675,13 @@ void OF_Switch::executePacketOutAction(const ofp_action_header *action, Packet *
            EV << "Dropping packet" << '\n';
     } else if (outport == OFPP_FLOOD){
         EV << "Flood Packet\n" << '\n';
-        unsigned int n = gateSize("dataPlaneOut");
+        unsigned int n = parent->gateSize("gateDataPlane$o");
         for (unsigned int i=0; i<n; ++i) {
             if(portVector[i].interfaceId != inport && !(portVector[i].state & OFPPS_BLOCKED)){
-                send(pktFrame->dup(), "dataPlaneOut", i);
+                auto pkt = pktFrame->dup();
+                pkt->addTagIfAbsent<PacketProtocolTag>()->setProtocol(&Protocol::unknown);
+                pkt->addTagIfAbsent<InterfaceReq>()->setInterfaceId(portVector[i].interfaceId );
+                send(pkt, "dataPlaneOut");
             }
         }
     }else {
@@ -628,7 +689,12 @@ void OF_Switch::executePacketOutAction(const ofp_action_header *action, Packet *
         if (indexPort == -1)
             throw cRuntimeError("Unknown dataPlaneOut sending port/gate %s",action_output->creationModule.c_str());
         EV << "Send Packet\n" << '\n';
-        send(pktFrame->dup(), "dataPlaneOut", indexPort);
+        auto pkt = pktFrame->dup();
+        pkt->addTagIfAbsent<PacketProtocolTag>()->setProtocol(&Protocol::unknown);
+        pkt->addTagIfAbsent<InterfaceReq>()->setInterfaceId(outport);
+
+        send(pkt, "dataPlaneOut");
+        //send(pktFrame->dup(), "dataPlaneOut", indexPort);
     }
     //delete pktFrame;
 }
@@ -636,7 +702,7 @@ void OF_Switch::executePacketOutAction(const ofp_action_header *action, Packet *
 
 // invoked by Spanning Tree module disable ports for broadcast packets
 void OF_Switch::disablePorts(vector<int> ports) {
-    EV << "disablePorts method at " << this->getParentModule()->getFullPath() << '\n';
+    EV << "disablePorts method at " << parent->getFullPath() << '\n';
 
     for (unsigned int i = 0; i<ports.size(); ++i){
         portVector[ports[i]].state |= OFPPS_BLOCKED;
@@ -650,14 +716,14 @@ void OF_Switch::disablePorts(vector<int> ports) {
         // Highlight links that belong to spanning tree
         for (unsigned int i = 0; i < portVector.size(); ++i){
             if (!(portVector[i].state & OFPPS_BLOCKED)){
-                cGate *gateOut = getParentModule()->gate("gateDataPlane$o", i);
+                cGate *gateOut = parent->gate("gateDataPlane$o", i);
                 do {
                     cDisplayString& connDispStrOut = gateOut->getDisplayString();
                     connDispStrOut.parse("ls=green,3,dashed");
                     gateOut = gateOut->getNextGate();
                 } while (gateOut != nullptr && !gateOut->getOwnerModule()->getModuleType()->isSimple());
 
-                cGate *gateIn = getParentModule()->gate("gateDataPlane$i", i);
+                cGate *gateIn = parent->gate("gateDataPlane$i", i);
                 do {
                     cDisplayString& connDispStrIn = gateIn->getDisplayString();
                     connDispStrIn.parse("ls=green,3,dashed");

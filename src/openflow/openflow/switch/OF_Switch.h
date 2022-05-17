@@ -13,10 +13,13 @@
 #include "inet/networklayer/common/NetworkInterface.h"
 #include <vector>
 
-class OF_Switch: public OperationalBase
+class OF_Switch: public OperationalBase, public TcpSocket::ICallback
 {
     std::map<int, int> ifaceIndex;
     std::map<int, int> controlPlaneIndex;
+
+    cModule *parent = nullptr;
+
 public:
     OF_Switch();
     ~OF_Switch();
@@ -72,6 +75,18 @@ protected:
     virtual bool isInitializeStage(int stage) const override { return stage == INITSTAGE_APPLICATION_LAYER; }
     virtual bool isModuleStartStage(int stage) const override { return stage == ModuleStartOperation::STAGE_APPLICATION_LAYER; }
     virtual bool isModuleStopStage(int stage) const override { return stage == ModuleStopOperation::STAGE_APPLICATION_LAYER; }
+
+
+    /* TcpSocket::ICallback callback methods */
+     virtual void socketDataArrived(TcpSocket *socket, Packet *msg, bool urgent) override;
+     virtual void socketAvailable(TcpSocket *socket, TcpAvailableInfo *availableInfo) override { socket->accept(availableInfo->getNewSocketId()); }
+     virtual void socketEstablished(TcpSocket *socket) override;
+     virtual void socketPeerClosed(TcpSocket *socket) override;
+     virtual void socketClosed(TcpSocket *socket) override;
+     virtual void socketFailure(TcpSocket *socket, int code) override;
+     virtual void socketStatusArrived(TcpSocket *socket, TcpStatusInfo *status) override {}
+     virtual void socketDeleted(TcpSocket *socket) override {}
+
 
 };
 
