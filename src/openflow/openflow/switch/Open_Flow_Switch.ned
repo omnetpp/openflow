@@ -36,7 +36,7 @@ module Open_Flow_Switch
         string routingFile = default("");
 
         *.forwarding = this.forwarding;
-        
+
         *.multicastForwarding = this.multicastForwarding;   // for IPv4, IPv6, Generic
         *.interfaceTableModule = default(absPath(".interfaceTable"));
         etherMAC[*].encap.typename = "OmittedEthernetEncapsulation"; //etherMAC[*].encapType = "EtherEncapDummy";
@@ -86,7 +86,7 @@ module Open_Flow_Switch
         ethernet: <default(sizeof(gateControlPlane) > 0 ? "EthernetEncapsulation" : "")> like IEthernetLayer if typename != "" {
             @display("p=352,478");
         }
-        
+
         interfaceTable: InterfaceTable {
             parameters:
                 @display("p=36,279");
@@ -99,7 +99,7 @@ module Open_Flow_Switch
             parameters:
                 @display("p=352,249;q=queue");
         }
-        
+
         eth[sizeof(gateControlPlane)]: EthernetInterface {
             parameters:
                 @display("p=313,664,row,90;q=txQueue");
@@ -108,18 +108,13 @@ module Open_Flow_Switch
         etherMAC[sizeof(gateDataPlane)]: <default("EthernetInterface")> like IWiredInterface {
             parameters:
                 mac.promiscuous = true;
-                @display("p=736,572,c,70");
+                @display("p=736,598,c,70");
         }
 
 
         ethDisp: MessageDispatcher {
             parameters:
-                @display("p=731,520;b=50,5,,,,1");
-        }
-
-        swDisp: MessageDispatcher {
-            parameters:
-                @display("p=731,394;b=50,5,,,,1");
+                @display("p=736,532;b=50,5,,,,1");
         }
 
 
@@ -128,9 +123,6 @@ module Open_Flow_Switch
 
         }
 
-        ethernet1: <default(sizeof(gateControlPlane) > 0 ? "EthernetEncapsulation" : "")> like IEthernetLayer if typename != "" {
-            @display("p=731,458");
-        }
     connections allowunconnected:
 
         at.out++ --> tn.in++;
@@ -183,14 +175,8 @@ module Open_Flow_Switch
         }
 
 
-        OF_Switch.dataPlaneOut --> swDisp.in++;
-        OF_Switch.dataPlaneIn <-- swDisp.out++;
-
-        ethernet1.upperLayerOut --> swDisp.in++;
-        swDisp.out++ --> ethernet1.upperLayerIn;
-
-        ethernet1.lowerLayerOut --> ethDisp.in++;
-        ethDisp.out++ --> ethernet1.lowerLayerIn;
+        OF_Switch.dataPlaneOut --> ethDisp.in++;
+        OF_Switch.dataPlaneIn <-- ethDisp.out++;
 
 
         for i=0..sizeof(gateDataPlane)-1 {

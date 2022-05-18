@@ -124,7 +124,7 @@ void OF_Switch::initialize(int stage){
     }
     else if (stage == INITSTAGE_APPLICATION_LAYER) {
         //init socket to controller
-        registerProtocol(Protocol::unknown, gate("dataPlaneOut"), gate("dataPlaneIn"));
+        registerProtocol(Protocol::ethernetMac, gate("dataPlaneOut"), gate("dataPlaneIn"));
         const char *localAddress = par("localAddress");
         int localPort = par("localPort");
         socket.setCallback(this);
@@ -520,7 +520,7 @@ void OF_Switch::processFrame(Packet *pkt){
            auto indexPort = getIndexFromId(outport);
            if (indexPort == -1)
                throw cRuntimeError("Unknown dataPlaneOut sending port/gate");
-           pkt->addTagIfAbsent<PacketProtocolTag>()->setProtocol(&Protocol::unknown);
+           pkt->addTagIfAbsent<PacketProtocolTag>()->setProtocol(&Protocol::ethernetMac);
            pkt->addTagIfAbsent<InterfaceReq>()->setInterfaceId(outport);
            send(pkt, "dataPlaneOut");
            //send(pkt, "dataPlaneOut", indexPort);
@@ -679,7 +679,7 @@ void OF_Switch::executePacketOutAction(const ofp_action_header *action, Packet *
         for (unsigned int i=0; i<n; ++i) {
             if(portVector[i].interfaceId != inport && !(portVector[i].state & OFPPS_BLOCKED)){
                 auto pkt = pktFrame->dup();
-                pkt->addTagIfAbsent<PacketProtocolTag>()->setProtocol(&Protocol::unknown);
+                pkt->addTagIfAbsent<PacketProtocolTag>()->setProtocol(&Protocol::ethernetMac);
                 pkt->addTagIfAbsent<InterfaceReq>()->setInterfaceId(portVector[i].interfaceId );
                 send(pkt, "dataPlaneOut");
             }
@@ -690,7 +690,7 @@ void OF_Switch::executePacketOutAction(const ofp_action_header *action, Packet *
             throw cRuntimeError("Unknown dataPlaneOut sending port/gate %s",action_output->creationModule.c_str());
         EV << "Send Packet\n" << '\n';
         auto pkt = pktFrame->dup();
-        pkt->addTagIfAbsent<PacketProtocolTag>()->setProtocol(&Protocol::unknown);
+        pkt->addTagIfAbsent<PacketProtocolTag>()->setProtocol(&Protocol::ethernetMac);
         pkt->addTagIfAbsent<InterfaceReq>()->setInterfaceId(outport);
 
         send(pkt, "dataPlaneOut");
