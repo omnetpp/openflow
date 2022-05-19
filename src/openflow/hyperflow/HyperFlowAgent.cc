@@ -9,6 +9,8 @@
 #define MSGKIND_CHECKALIVEEVERY 703
 #define MSGKIND_HFCONNECT 704
 
+simsignal_t HyperFlowAgent::HyperFlowReFireSignalId = registerSignal("HyperFlowReFire");
+
 Define_Module(HyperFlowAgent);
 
 HyperFlowAgent::HyperFlowAgent(){
@@ -38,8 +40,6 @@ void HyperFlowAgent::initialize(int stage){
         //socket.setDataTransferMode(TCP_TRANSFER_OBJECT);
         //schedule connection setup
 
-        //register signals
-        HyperFlowReFireSignalId =registerSignal("HyperFlowReFire");
     }
 }
 
@@ -188,7 +188,7 @@ void HyperFlowAgent::handleSyncReply(HF_SyncReply * msg){
         if(strcmp((*iterData).srcController.c_str(),controller->getFullPath().c_str())!=0){
             HF_ReFire_Wrapper * rfWrapper = new HF_ReFire_Wrapper();
             rfWrapper->setDataChannelEntry(*iterData);
-            emit(HyperFlowReFireSignalId,rfWrapper);
+            emit(HyperFlowReFireSignalId, rfWrapper);
             delete rfWrapper;
         }
     }
@@ -216,9 +216,9 @@ void HyperFlowAgent::handleCheckAlive(){
 }
 
 void HyperFlowAgent::synchronizeDataChannelEntry(DataChannelEntry entry){
-    EV << "HyperFlowAgent::Sent Change" << endl;
     Enter_Method_Silent();
 
+    EV_DEBUG << "HyperFlowAgent::Sent Change" << endl;
     auto change = makeShared<HF_ChangeNotification>();
     change->setChunkLength(B(sizeof(entry)));
     change->setEntry(entry);

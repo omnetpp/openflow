@@ -8,6 +8,13 @@
 #include "inet/networklayer/common/L3AddressResolver.h"
 #include "inet/common/ModuleAccess.h"
 
+
+simsignal_t AbstractControllerApp::PacketInSignalId = registerSignal("PacketIn");
+simsignal_t AbstractControllerApp::PacketOutSignalId = registerSignal("PacketOut");
+simsignal_t AbstractControllerApp::PacketFeatureRequestSignalId = registerSignal("PacketFeatureRequest");
+simsignal_t AbstractControllerApp::PacketFeatureReplySignalId = registerSignal("PacketFeatureReply");
+simsignal_t AbstractControllerApp::BootedSignalId = registerSignal("Booted");
+
 Define_Module(AbstractControllerApp);
 
 AbstractControllerApp::AbstractControllerApp()
@@ -46,21 +53,11 @@ void AbstractControllerApp::initialize(int stage){
     //register signals
     OperationalBase::initialize(stage);
     if (stage == INITSTAGE_LOCAL) {
-        PacketInSignalId =registerSignal("PacketIn");
-        PacketOutSignalId =registerSignal("PacketOut");
-        PacketFeatureRequestSignalId = registerSignal("PacketFeatureRequest");
-        PacketFeatureReplySignalId = registerSignal("PacketFeatureReply");
-        BootedSignalId= registerSignal("Booted");
         getParentModule()->subscribe("PacketIn",this);
         getParentModule()->subscribe("PacketOut",this);
         getParentModule()->subscribe("PacketFeatureRequest",this);
         getParentModule()->subscribe("PacketFeatureReply",this);
         getParentModule()->subscribe("Booted",this);
-        packetsFlooded=0;
-        packetsDropped=0;
-        numPacketOut=0;
-        numFlowMod=0;
-        controller= NULL;
     }
     else if (stage == INITSTAGE_APPLICATION_LAYER) {
         auto myNode = getContainingNode(this);
@@ -87,11 +84,13 @@ void AbstractControllerApp::receiveSignal(cComponent *src, simsignal_t id, cObje
             this->controller = cntrl;
             controller->registerApp(this);
         }
-
     }
 }
 
 void AbstractControllerApp::floodPacket(Packet *packet_in_msg){
+
+    if (controller == nullptr)
+        throw cRuntimeError("Controller module is not initialized");
     auto header_in = packet_in_msg->peekAtFront<OFP_Packet_In>();
     EV << "floodPacket" << '\n';
     packetsFlooded++;
@@ -101,6 +100,10 @@ void AbstractControllerApp::floodPacket(Packet *packet_in_msg){
 }
 
 void AbstractControllerApp::dropPacket(Packet *packet_in_msg){
+
+    if (controller == nullptr)
+        throw cRuntimeError("Controller module is not initialized");
+
     auto header_in = packet_in_msg->peekAtFront<OFP_Packet_In>();
     EV << "dropPacket" << '\n';
     packetsDropped++;
@@ -113,6 +116,9 @@ void AbstractControllerApp::dropPacket(Packet *packet_in_msg){
 
 void AbstractControllerApp::sendPacket(Packet *packet_in_msg, uint32_t outport){
 
+    if (controller == nullptr)
+        throw cRuntimeError("Controller module is not initialized");
+
     auto header_in = packet_in_msg->peekAtFront<OFP_Packet_In>();
 
     EV << "sendPacket" << '\n';
@@ -124,6 +130,9 @@ void AbstractControllerApp::sendPacket(Packet *packet_in_msg, uint32_t outport){
 }
 
 void AbstractControllerApp::sendFlowModMessage(ofp_flow_mod_command mod_com, const oxm_basic_match &match, uint32_t outport, TcpSocket * socket, int idleTimeOut =1 , int hardTimeOut=0){
+    if (controller == nullptr)
+        throw cRuntimeError("Controller module is not initialized");
+
     EV << "sendFlowModMessage" << '\n';
     numFlowMod++;
     auto msgAux = createFlowMod(mod_com,match,outport,idleTimeOut,hardTimeOut);

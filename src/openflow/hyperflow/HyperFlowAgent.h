@@ -46,7 +46,7 @@ protected:
     std::list<std::string> knownControllers;
     std::list<std::string> failedControllers;
 
-    simsignal_t HyperFlowReFireSignalId;
+    static simsignal_t HyperFlowReFireSignalId;
 
     virtual void handleStartOperation(LifecycleOperation *operation) override;
 

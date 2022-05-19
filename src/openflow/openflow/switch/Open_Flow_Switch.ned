@@ -39,21 +39,37 @@ module Open_Flow_Switch
 
         *.multicastForwarding = this.multicastForwarding;   // for IPv4, IPv6, Generic
         *.interfaceTableModule = default(absPath(".interfaceTable"));
-        etherMAC[*].encap.typename = "OmittedEthernetEncapsulation"; //etherMAC[*].encapType = "EtherEncapDummy";
+
         etherMAC[*].csmacdSupport = this.csmacdSupport;
         etherMAC[*].duplexMode = this.duplexMode;
+
         OF_Switch.sendCompletePacket = this.sendCompletePacket;
         ipv4.arp.proxyArpInterfaces = default(""); //*.proxyARP = false;
 
-
-        ethernet1.registerProtocol = default(true);
         ethernet.registerProtocol = default(true);
-
     gates:
         inout gateControlPlane[] @labels(ControlPlane);
         inout gateDataPlane[] @labels(DataPlane);
 
     submodules:
+        
+        
+        OF_Switch: OF_Switch {
+            @display("p=442,43");
+
+        }
+        
+        eth[sizeof(gateControlPlane)]: EthernetInterface {
+            parameters:
+                @display("p=313,664,row,90;q=txQueue");
+        }
+
+        etherMAC[sizeof(gateDataPlane)]: EthernetInterface {
+            parameters:
+                mac.promiscuous = true;
+                @display("p=736,598,c,70");
+        }
+        
         at: MessageDispatcher {
             parameters:
                 @display("p=400,101;b=580,5,,,,1");
@@ -79,6 +95,13 @@ module Open_Flow_Switch
                 @display("p=400,532;b=500,5,,,,1");
         }
 
+
+        ethDisp: MessageDispatcher {
+            parameters:
+                @display("p=736,532;b=50,5,,,,1");
+        }
+
+
         bridging: <default("")> like IProtocolLayer if typename != "" {
             @display("p=297,405");
         }
@@ -99,30 +122,9 @@ module Open_Flow_Switch
             parameters:
                 @display("p=352,249;q=queue");
         }
+        
 
-        eth[sizeof(gateControlPlane)]: EthernetInterface {
-            parameters:
-                @display("p=313,664,row,90;q=txQueue");
-        }
-
-        etherMAC[sizeof(gateDataPlane)]: <default("EthernetInterface")> like IWiredInterface {
-            parameters:
-                mac.promiscuous = true;
-                @display("p=736,598,c,70");
-        }
-
-
-        ethDisp: MessageDispatcher {
-            parameters:
-                @display("p=736,532;b=50,5,,,,1");
-        }
-
-
-        OF_Switch: OF_Switch {
-            @display("p=442,43");
-
-        }
-
+        
     connections allowunconnected:
 
         at.out++ --> tn.in++;
@@ -161,7 +163,10 @@ module Open_Flow_Switch
 
         at.out++ --> OF_Switch.controlPlaneIn;
         OF_Switch.controlPlaneOut --> at.in++;
-
+        
+        OF_Switch.dataPlaneOut --> ethDisp.in++;
+        OF_Switch.dataPlaneIn <-- ethDisp.out++;
+        
         bl.out++ --> ethernet.upperLayerIn if exists(ethernet);
         ethernet.upperLayerOut --> bl.in++ if exists(ethernet);
 
@@ -174,14 +179,12 @@ module Open_Flow_Switch
             eth[i].phys <--> { @display("m=s"); } <--> gateControlPlane[i];
         }
 
-
-        OF_Switch.dataPlaneOut --> ethDisp.in++;
-        OF_Switch.dataPlaneIn <-- ethDisp.out++;
-
-
         for i=0..sizeof(gateDataPlane)-1 {
             ethDisp.out++ --> etherMAC[i].upperLayerIn;
             etherMAC[i].upperLayerOut --> ethDisp.in++;
             etherMAC[i].phys <--> { @display("m=s"); } <--> gateDataPlane[i];
         }
+
+
 }
+

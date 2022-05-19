@@ -312,6 +312,7 @@ struct ofp_port {
     uint32_t curr_speed;    /* Current port bitrate in kbps. */
     uint32_t max_speed;     /* Max port bitrate in kbps */
     int interfaceId = -1;
+    cModule *mac = nullptr;
 };
 
 enum ofp_port_config {

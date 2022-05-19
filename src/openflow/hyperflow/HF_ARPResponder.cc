@@ -7,6 +7,8 @@
 
 #define MSGKIND_ARPRESPONDERBOOTED 801
 
+simsignal_t HF_ARPResponder::HyperFlowReFireSignalId = registerSignal("HyperFlowReFire");
+
 Define_Module(HF_ARPResponder);
 
 HF_ARPResponder::HF_ARPResponder(){
@@ -21,9 +23,7 @@ void HF_ARPResponder::initialize(int stage){
 
     ARPResponder::initialize(stage);
     if (stage == INITSTAGE_LOCAL) {
-        hfAgent = NULL;
         //register signals
-        HyperFlowReFireSignalId =registerSignal("HyperFlowReFire");
         getParentModule()->subscribe("HyperFlowReFire",this);
     }
 }
@@ -33,6 +33,9 @@ void HF_ARPResponder::initialize(int stage){
 void HF_ARPResponder::handlePacketIn(Packet * pkt){
 
     CommonHeaderFields headerFields = extractCommonHeaderFields(pkt);
+
+    if (controller == nullptr)
+        throw cRuntimeError("Controller module is not initialized");
 
     //check if it is an arp packet
     if(headerFields.eth_type == ETHERTYPE_ARP){
@@ -50,9 +53,10 @@ void HF_ARPResponder::handlePacketIn(Packet * pkt){
                 entry.srcController = controller->getFullPath();
                 entry.payload = wrapperArp;
 
+                if (hfAgent == nullptr)
+                    throw cRuntimeError("HyperFlowAgent not synchronized, check if the agent is present in the network");
                 hfAgent->synchronizeDataChannelEntry(entry);
             }
-
 
             //check arp type
             if(headerFields.arp_op == ARP_REQUEST){
@@ -146,10 +150,25 @@ void HF_ARPResponder::handlePacketIn(Packet * pkt){
                     floodPacket(pkt);
                 }
             }
-
-
     }
+}
 
+bool HF_ARPResponder::searchHyperFlowAggent()
+{
+    if (hfAgent)
+        return true;
+    if(hfAgent == nullptr && controller != nullptr){
+        auto appList = controller->getAppList();
+        for(auto iterApp=appList->begin();iterApp!=appList->end();++iterApp){
+            if(dynamic_cast<HyperFlowAgent *>(*iterApp) != NULL) {
+                HyperFlowAgent *hf = (HyperFlowAgent *) *iterApp;
+                hfAgent = hf;
+                return true;
+                break;
+            }
+        }
+    }
+    return false;
 }
 
 
@@ -157,17 +176,8 @@ void HF_ARPResponder::receiveSignal(cComponent *src, simsignal_t id, cObject *ob
     //set hfagent link
     ARPResponder::receiveSignal(src,id,obj,details);
     Enter_Method("HF_ARPResponder::receiveSignal %s", cComponent::getSignalName(id));
-    if(hfAgent == NULL && controller != NULL){
-        auto appList = controller->getAppList();
-
-        for(auto iterApp=appList->begin();iterApp!=appList->end();++iterApp){
-            if(dynamic_cast<HyperFlowAgent *>(*iterApp) != NULL) {
-                HyperFlowAgent *hf = (HyperFlowAgent *) *iterApp;
-                hfAgent = hf;
-                break;
-            }
-        }
-    }
+    if (!searchHyperFlowAggent())
+        throw cRuntimeError("HyperFlowAgent not synchronized, check if the agent is present in the network");
 
     //check for hf messages to refire
     if(id == HyperFlowReFireSignalId){

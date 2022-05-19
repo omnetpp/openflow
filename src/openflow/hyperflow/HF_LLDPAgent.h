@@ -25,11 +25,12 @@ public:
     LLDPMibGraph * getMibGraph();
 
 protected:
+    virtual bool searchHyperFlowAggent();
     virtual void receiveSignal(cComponent *src, simsignal_t id, cObject *obj, cObject *details) override;
     virtual void initialize(int stage) override;
     virtual void handlePacketIn(Packet *) override;
-    HyperFlowAgent * hfAgent;
-    simsignal_t HyperFlowReFireSignalId;
+    HyperFlowAgent * hfAgent = nullptr;
+    static simsignal_t HyperFlowReFireSignalId;
 };
 
 

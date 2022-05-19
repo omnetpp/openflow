@@ -38,6 +38,14 @@ OF_Switch::OF_Switch(){
 
 OF_Switch::~OF_Switch(){
 
+    for(auto &elem : portVector){
+        if (elem.mac != nullptr) {
+            auto gateO = elem.mac->gate("phys$o");
+            auto gateI = elem.mac->gate("phys$i");
+            gateO->disconnect();
+            gateI->disconnect();
+        }
+    }
 }
 
 int OF_Switch::getIndexFromId(int id) {
@@ -96,6 +104,7 @@ void OF_Switch::initialize(int stage){
             if(dynamic_cast<EthernetMacBase *>(ethernetMacModule) != nullptr) {
                 auto nic = (EthernetMacBase*)ethernetMacModule;
                 uint64_t tmpHw = nic->getMacAddress().getInt();
+                portVector[i].mac = nic;
                 memcpy(portVector[i].hw_addr,&tmpHw, sizeof tmpHw);
             }
             sprintf(portVector[i].name,"Port: %d",i);
@@ -115,12 +124,15 @@ void OF_Switch::initialize(int stage){
         auto eth0Iface = interfaceTable->findInterfaceByName("eth0");
         if (eth0Iface == nullptr)
             throw cRuntimeError("OF_Switch::Interface eth0 doesn't exist");
+#if 0
+        // In the original code, but in the original code this will be never executed due to that the table is checked before the interfaces are registered.
         for(int i=0; i< interfaceTable->getNumInterfaces() ;i++){
             if (interfaceTable->getInterface(i) != eth0Iface) {
                 interfaceTable->getInterface(i)->setState(NetworkInterface::State::DOWN);
                 listInterfacesToDelete.push_back(interfaceTable->getInterface(i)); // The interfaces cannot be deleted in the initalization phase
             }
         }
+#endif
     }
     else if (stage == INITSTAGE_APPLICATION_LAYER) {
         //init socket to controller
@@ -522,6 +534,7 @@ void OF_Switch::processFrame(Packet *pkt){
                throw cRuntimeError("Unknown dataPlaneOut sending port/gate");
            pkt->addTagIfAbsent<PacketProtocolTag>()->setProtocol(&Protocol::ethernetMac);
            pkt->addTagIfAbsent<InterfaceReq>()->setInterfaceId(outport);
+           pkt->removeTagIfPresent<DispatchProtocolReq>();
            send(pkt, "dataPlaneOut");
            //send(pkt, "dataPlaneOut", indexPort);
        }
@@ -679,6 +692,7 @@ void OF_Switch::executePacketOutAction(const ofp_action_header *action, Packet *
         for (unsigned int i=0; i<n; ++i) {
             if(portVector[i].interfaceId != inport && !(portVector[i].state & OFPPS_BLOCKED)){
                 auto pkt = pktFrame->dup();
+                pkt->removeTagIfPresent<DispatchProtocolReq>();
                 pkt->addTagIfAbsent<PacketProtocolTag>()->setProtocol(&Protocol::ethernetMac);
                 pkt->addTagIfAbsent<InterfaceReq>()->setInterfaceId(portVector[i].interfaceId );
                 send(pkt, "dataPlaneOut");
@@ -690,6 +704,7 @@ void OF_Switch::executePacketOutAction(const ofp_action_header *action, Packet *
             throw cRuntimeError("Unknown dataPlaneOut sending port/gate %s",action_output->creationModule.c_str());
         EV << "Send Packet\n" << '\n';
         auto pkt = pktFrame->dup();
+        pkt->removeTagIfPresent<DispatchProtocolReq>();
         pkt->addTagIfAbsent<PacketProtocolTag>()->setProtocol(&Protocol::ethernetMac);
         pkt->addTagIfAbsent<InterfaceReq>()->setInterfaceId(outport);
 

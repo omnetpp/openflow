@@ -6,6 +6,8 @@
 #define MSGKIND_TRIGGERLLDP 101
 #define MSGKIND_LLDPAGENTBOOTED 201
 
+simsignal_t HF_LLDPAgent::HyperFlowReFireSignalId = registerSignal("HyperFlowReFire");
+
 Define_Module(HF_LLDPAgent);
 
 HF_LLDPAgent::HF_LLDPAgent(){
@@ -19,9 +21,7 @@ HF_LLDPAgent::~HF_LLDPAgent(){
 void HF_LLDPAgent::initialize(int stage){
     LLDPAgent::initialize(stage);
     if (stage == INITSTAGE_LOCAL) {
-        hfAgent = NULL;
     //register signals
-       HyperFlowReFireSignalId =registerSignal("HyperFlowReFire");
        getParentModule()->subscribe("HyperFlowReFire",this);
     }
 }
@@ -64,6 +64,9 @@ void HF_LLDPAgent::handlePacketIn(Packet *pktIn){
             entry.srcController = controller->getFullPath();
             entry.payload = wrapper;
 
+            if (hfAgent == nullptr)
+                throw cRuntimeError("HyperFlowAgent not synchronized");
+
             hfAgent->synchronizeDataChannelEntry(entry);
             pktIn->insertAtFront(frame);
             pktIn->insertAtFront(packet_in_msg);
@@ -93,7 +96,9 @@ void HF_LLDPAgent::handlePacketIn(Packet *pktIn){
              entry.trgSwitch = "";
              entry.srcController = controller->getFullPath();
              entry.payload = wrapper;
-
+             if (hfAgent == nullptr) {
+                 throw cRuntimeError("HyperFlowAgent not synchronized, check if the agent is present in the network");
+             }
              hfAgent->synchronizeDataChannelEntry(entry);
          }
      }
@@ -103,24 +108,33 @@ void HF_LLDPAgent::handlePacketIn(Packet *pktIn){
 
 }
 
+bool HF_LLDPAgent::searchHyperFlowAggent()
+{
+    if (hfAgent)
+        return true;
+
+    if(hfAgent == nullptr && controller != nullptr){
+        auto appList = controller->getAppList();
+        for(auto iterApp=appList->begin();iterApp!=appList->end();++iterApp){
+            if(dynamic_cast<HyperFlowAgent *>(*iterApp) != NULL) {
+                HyperFlowAgent *hf = (HyperFlowAgent *) *iterApp;
+                hfAgent = hf;
+                return true;
+                break;
+            }
+        }
+    }
+    return false;
+}
+
 
 void HF_LLDPAgent::receiveSignal(cComponent *src, simsignal_t id, cObject *obj, cObject *details) {
     //set hfagent link
     LLDPAgent::receiveSignal(src,id,obj,details);
     Enter_Method("HF_LLDPAgent::receiveSignal %s", cComponent::getSignalName(id));
-    if(hfAgent == NULL && controller != NULL){
-        auto appList = controller->getAppList();
 
-        for(auto iterApp=appList->begin();iterApp!=appList->end();++iterApp){
-            if(dynamic_cast<HyperFlowAgent *>(*iterApp) != NULL) {
-                HyperFlowAgent *hf = (HyperFlowAgent *) *iterApp;
-                hfAgent = hf;
-                break;
-            }
-        }
-    }
-
-
+    if (!searchHyperFlowAggent())
+        throw cRuntimeError("HyperFlowAgent not synchronized, check if the agent is present in the network");
 
     //check for hf messages to refire
     if(id == HyperFlowReFireSignalId){

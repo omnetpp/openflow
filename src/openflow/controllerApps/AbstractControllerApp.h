@@ -39,18 +39,18 @@ protected:
     virtual int getIndexFromId(int id);
 
 
-    simsignal_t PacketInSignalId;
-    simsignal_t PacketOutSignalId;
-    simsignal_t PacketFeatureRequestSignalId;
-    simsignal_t PacketFeatureReplySignalId;
-    simsignal_t BootedSignalId;
+    static simsignal_t PacketInSignalId;
+    static simsignal_t PacketOutSignalId;
+    static simsignal_t PacketFeatureRequestSignalId;
+    static simsignal_t PacketFeatureReplySignalId;
+    static simsignal_t BootedSignalId;
 
-    long packetsFlooded;
-    long packetsDropped;
-    long numPacketOut;
-    long numFlowMod;
+    long packetsFlooded = 0;
+    long packetsDropped = 0;
+    long numPacketOut = 0;
+    long numFlowMod = 0;
 
-    OF_Controller * controller;
+    OF_Controller * controller = nullptr;
 
     virtual int numInitStages() const override { return NUM_INIT_STAGES; }
     virtual void initialize(int stage) override;
