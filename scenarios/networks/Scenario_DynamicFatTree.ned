@@ -16,11 +16,11 @@ network Scenario_DynamicFatTree
 
 
     types:
-        channel backboneline extends Eth40G
+        channel backboneline extends ThruputMeteringChannel
         {
-            length = 200m; // delay = 1us;
-            //datarate = 40Gbps;
-            //thruputDisplayFormat = "u";
+            delay = 1us;
+            datarate = 40Gbps;
+            thruputDisplayFormat = "u";
         }
     submodules:
 
@@ -32,11 +32,11 @@ network Scenario_DynamicFatTree
             @display("p=458,270");
         }
 
-
         configurator: Ipv4NetworkConfigurator {
             parameters:
                 @display("p=198,190");
         }
+
         open_flow_controller1: Open_Flow_Controller {
             @display("p=322,190");
         }
@@ -44,8 +44,6 @@ network Scenario_DynamicFatTree
         fat_tree: DynamicFatTree {
             @display("p=322,367;is=vl");
         }
-
-
 
     connections allowunconnected:
 
