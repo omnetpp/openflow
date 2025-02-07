@@ -393,7 +393,11 @@ static bool chekIcmpEchoRequest(Packet *pkt, int &seqNumber, int &identifier) {
     PacketDissector::PduTreeBuilder pduTreeBuilder;
     auto packetProtocolTag = pkt->findTag<PacketProtocolTag>();
     auto protocol = packetProtocolTag != nullptr ? packetProtocolTag->getProtocol() : nullptr;
+#if INET_VERSION >= 0x0405
+    PacketDissector packetDissector(ProtocolDissectorRegistry::getInstance(), pduTreeBuilder);
+#else
     PacketDissector packetDissector(ProtocolDissectorRegistry::globalRegistry, pduTreeBuilder);
+#endif
     packetDissector.dissectPacket(pkt, protocol);
 
     auto& protocolDataUnit = pduTreeBuilder.getTopLevelPdu();
