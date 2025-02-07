@@ -2,15 +2,14 @@
 
 package openflow.openflow.switch;
 
-import inet.linklayer.contract.IWiredInterface;
-import inet.linklayer.ethernet.EthernetInterface;
+import inet.common.MessageDispatcher;
+import inet.linklayer.contract.IEthernetLayer;
+import inet.linklayer.ethernet.basic.EthernetInterface;
 import inet.networklayer.common.InterfaceTable;
 import inet.networklayer.contract.INetworkLayer;
-import inet.networklayer.contract.IRoutingTable;
-import inet.transportlayer.contract.ITcp;
-import inet.common.MessageDispatcher;
-import inet.linklayer.ethernet.contract.IEthernetLayer;
 import inet.protocolelement.contract.IProtocolLayer;
+import inet.transportlayer.contract.ITcp;
+
 
 module Open_Flow_Switch
 {
@@ -52,13 +51,13 @@ module Open_Flow_Switch
         inout gateDataPlane[] @labels(DataPlane);
 
     submodules:
-        
-        
+
+
         OF_Switch: OF_Switch {
             @display("p=442,43");
 
         }
-        
+
         eth[sizeof(gateControlPlane)]: EthernetInterface {
             parameters:
                 @display("p=313,664,row,90;q=txQueue");
@@ -69,7 +68,7 @@ module Open_Flow_Switch
                 mac.promiscuous = true;
                 @display("p=736,598,c,70");
         }
-        
+
         at: MessageDispatcher {
             parameters:
                 @display("p=400,101;b=580,5,,,,1");
@@ -122,9 +121,9 @@ module Open_Flow_Switch
             parameters:
                 @display("p=352,249;q=queue");
         }
-        
 
-        
+
+
     connections allowunconnected:
 
         at.out++ --> tn.in++;
@@ -163,10 +162,10 @@ module Open_Flow_Switch
 
         at.out++ --> OF_Switch.controlPlaneIn;
         OF_Switch.controlPlaneOut --> at.in++;
-        
+
         OF_Switch.dataPlaneOut --> ethDisp.in++;
         OF_Switch.dataPlaneIn <-- ethDisp.out++;
-        
+
         bl.out++ --> ethernet.upperLayerIn if exists(ethernet);
         ethernet.upperLayerOut --> bl.in++ if exists(ethernet);
 

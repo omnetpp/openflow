@@ -1,14 +1,15 @@
 
 
 package openflow.hyperflow;
-import inet.linklayer.ethernet.EthernetInterface;
+import inet.common.MessageDispatcher;
+import inet.linklayer.contract.IEthernetLayer;
+import inet.linklayer.ethernet.basic.EthernetInterface;
 import inet.networklayer.common.InterfaceTable;
 import inet.networklayer.contract.INetworkLayer;
-import inet.networklayer.contract.IRoutingTable;
-import inet.transportlayer.contract.ITcp;
-import inet.common.MessageDispatcher;
-import inet.linklayer.ethernet.contract.IEthernetLayer;
 import inet.protocolelement.contract.IProtocolLayer;
+import inet.transportlayer.contract.ITcp;
+
+
 //
 // TODO documentation
 //
