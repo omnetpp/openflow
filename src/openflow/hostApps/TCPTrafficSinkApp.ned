@@ -4,17 +4,8 @@ package openflow.hostApps;
 
 
 import inet.applications.contract.IApp;
+import inet.applications.tcpapp.TcpSinkApp;
 
-
-simple TCPTrafficSinkApp like IApp
+module TCPTrafficSinkApp extends TcpSinkApp like IApp
 {
-    parameters:
-        @display("i=block/app");
-        string localAddress = default("");
-        int localPort = default(-1);  // local port
-
-    gates:
-        input socketIn @labels(TcpCommand/up);
-        output socketOut @labels(TcpCommand/down);
 }
-
