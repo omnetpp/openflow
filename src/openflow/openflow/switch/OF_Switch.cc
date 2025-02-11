@@ -735,19 +735,17 @@ void OF_Switch::disablePorts(vector<int> ports) {
         // Highlight links that belong to spanning tree
         for (unsigned int i = 0; i < portVector.size(); ++i){
             if (!(portVector[i].state & OFPPS_BLOCKED)){
-                cGate *gateOut = parent->gate("gateDataPlane$o", i);
-                do {
+                for (cGate *gateOut = parent->gate("gateDataPlane$o", i); gateOut->getNextGate() != nullptr; gateOut = gateOut->getNextGate()) {
                     cDisplayString& connDispStrOut = gateOut->getDisplayString();
                     connDispStrOut.parse("ls=green,3,dashed");
-                    gateOut = gateOut->getNextGate();
-                } while (gateOut != nullptr && !gateOut->getOwnerModule()->getModuleType()->isSimple());
+                }
 
-                cGate *gateIn = parent->gate("gateDataPlane$i", i);
-                do {
-                    cDisplayString& connDispStrIn = gateIn->getDisplayString();
-                    connDispStrIn.parse("ls=green,3,dashed");
-                    gateIn = gateIn->getPreviousGate();
-                } while (gateIn != nullptr && !gateIn->getOwnerModule()->getModuleType()->isSimple());
+                for (cGate *gateIn = parent->gate("gateDataPlane$i", i); gateIn != nullptr; gateIn = gateIn->getPreviousGate()) {
+                    if (gateIn->getNextGate() != nullptr) {
+                        cDisplayString& connDispStrIn = gateIn->getDisplayString();
+                        connDispStrIn.parse("ls=green,3,dashed");
+                    }
+                }
             }
         }
     }
