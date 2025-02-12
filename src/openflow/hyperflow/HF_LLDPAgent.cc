@@ -133,8 +133,7 @@ void HF_LLDPAgent::receiveSignal(cComponent *src, simsignal_t id, cObject *obj, 
     LLDPAgent::receiveSignal(src,id,obj,details);
     Enter_Method("HF_LLDPAgent::receiveSignal %s", cComponent::getSignalName(id));
 
-    if (!searchHyperFlowAggent())
-        throw cRuntimeError("HyperFlowAgent not synchronized, check if the agent is present in the network");
+    searchHyperFlowAggent();
 
     //check for hf messages to refire
     if(id == HyperFlowReFireSignalId){

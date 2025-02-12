@@ -176,8 +176,7 @@ void HF_ARPResponder::receiveSignal(cComponent *src, simsignal_t id, cObject *ob
     //set hfagent link
     ARPResponder::receiveSignal(src,id,obj,details);
     Enter_Method("HF_ARPResponder::receiveSignal %s", cComponent::getSignalName(id));
-    if (!searchHyperFlowAggent())
-        throw cRuntimeError("HyperFlowAgent not synchronized, check if the agent is present in the network");
+    searchHyperFlowAggent();
 
     //check for hf messages to refire
     if(id == HyperFlowReFireSignalId){
