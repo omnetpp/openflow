@@ -61,6 +61,7 @@ void KandooAgent::handleMessageWhenUp(cMessage *msg){
             //init socket to synchronizer
             const char *connectAddressRootController = par("connectAddressRootController");
             int connectPort = par("connectPortRootController");
+            socket.renewSocket();
             socket.connect(L3AddressResolver().resolve(connectAddressRootController), connectPort);
         }
     }
