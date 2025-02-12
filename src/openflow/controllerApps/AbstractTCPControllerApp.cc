@@ -15,7 +15,15 @@ AbstractTCPControllerApp::AbstractTCPControllerApp()
 
 AbstractTCPControllerApp::~AbstractTCPControllerApp()
 {
+    for(auto&& msg : msgList) {
+      delete msg;
+    }
+    msgList.clear();
 
+    for(auto&& pair : socketMap){
+        delete pair.second;
+    }
+    socketMap.clear();
 }
 
 
