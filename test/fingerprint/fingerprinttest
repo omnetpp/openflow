@@ -1,0 +1,7 @@
+#!/bin/bash
+echo "Hint: You may want to use the '-F tyf' option to exclude graphical (tyf) fingerprints, as they are not regularly kept up to date"
+
+FP_EXTRA_OPTIONS="-l $OPENFLOW_ROOT/src/openflow6 -n $INET_ROOT/src:$OPENFLOW_ROOT/scenarios:$OPENFLOW_ROOT/src --image-path=$INET_ROOT/images"
+echo FP_EXTRA_OPTIONS=$FP_EXTRA_OPTIONS
+
+$INET_ROOT/bin/inet_fingerprinttest --executable opp_run --directory $OPENFLOW_ROOT "$@" -a $FP_EXTRA_OPTIONS
